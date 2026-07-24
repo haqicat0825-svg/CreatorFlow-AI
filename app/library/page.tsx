@@ -7,6 +7,7 @@ import { KnowledgeLibrary } from "@/components/knowledge-library";
 import { ResearchLibrary } from "@/components/research-library";
 import { libraryItems } from "@/data/mock";
 import type { LibraryItem } from "@/lib/types";
+import { segmentedControlClass } from "@/lib/ui/segmented-control";
 
 const cats = ["全部","爆款案例","我的风格","标题公式","视觉素材"] as const;
 export default function LibraryPage() {
@@ -21,7 +22,7 @@ export default function LibraryPage() {
     <ResearchLibrary/>
     <KnowledgeLibrary/>
     <div className="mt-9 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-      <div className="flex gap-2 overflow-x-auto pb-1">{cats.map(c=><button key={c} onClick={()=>setCategory(c)} className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold ${category===c?"bg-[var(--ink)] text-white":"border border-[var(--line)] bg-white/60"}`}>{c}</button>)}</div>
+      <div className="flex gap-2 overflow-x-auto pb-1">{cats.map(c=><button key={c} aria-pressed={category===c} onClick={()=>setCategory(c)} className={`whitespace-nowrap ${segmentedControlClass(category===c)}`}>{c}</button>)}</div>
       <label className="flex min-w-[290px] items-center gap-2 rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-2.5"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="搜索标题或 AI 标签" className="w-full bg-transparent text-sm outline-none"/><SlidersHorizontal size={15}/></label>
     </div>
     <section className="masonry mt-7">{filtered.map(item=><ContentCard key={item.id} item={item} saved={saved.has(item.id)} onToggleSave={()=>toggle(item.id)} onOpen={()=>setSelected(item)}/>)}</section>

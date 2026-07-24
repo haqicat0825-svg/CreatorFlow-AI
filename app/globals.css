@@ -19,6 +19,7 @@ html { background: var(--cream); }
 body { margin: 0; color: var(--ink); background: var(--cream); font-family: Arial, "Microsoft YaHei", sans-serif; }
 button, input, textarea, select { font: inherit; }
 button { color: inherit; }
+.segmented-control-selected { color: #9b5664; }
 button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible {
   outline: 3px solid rgba(183, 126, 137, .32); outline-offset: 3px;
 }

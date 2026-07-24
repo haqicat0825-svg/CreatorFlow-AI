@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Check, Expand } from "lucide-react";
 import { PageHeader } from "@/components/page-header";
+import { ModelStatusPanel } from "@/components/model-status-panel";
 import { PromptCard, type PromptSettings } from "@/components/prompt-card";
 import { loadImagePreferences, saveImagePreferences } from "@/lib/models/client-storage";
 import type { GeneratedImage, ImageGenerationResult } from "@/lib/providers/image-types";
@@ -29,6 +30,7 @@ export default function VisualStudioPage() {
   const [task, setTask] = useState<VisualTask | null>(null);
   const [settings, setSettings] = useState<PromptSettings>(initialSettings);
   const [serverOpenAIModel, setServerOpenAIModel] = useState("gpt-image-1");
+  const [serverConfigured, setServerConfigured] = useState(false);
   const [images, setImages] = useState<GeneratedImage[]>([]);
   const [resultMeta, setResultMeta] = useState<Pick<ImageGenerationResult, "provider" | "model" | "isMock"> | null>(null);
   const [selected, setSelected] = useState("");
@@ -71,6 +73,7 @@ export default function VisualStudioPage() {
         body: JSON.stringify({ kind: "image" }),
       });
       const payload = await response.json();
+      setServerConfigured(Boolean(payload.configured));
       if (payload.provider === "openai" && payload.model) setServerOpenAIModel(payload.model);
       setSettings(current => ({
         ...current,
@@ -148,7 +151,7 @@ export default function VisualStudioPage() {
       {resultMeta && generationState === "success" && <p className={`rounded-xl px-4 py-2 text-sm ${resultMeta.isMock ? "bg-[var(--almond)] font-semibold" : "text-[var(--muted)]"}`}>{resultMeta.isMock ? "Demo / Mock：未调用真实图片模型。" : `真实模型：${resultMeta.provider} / ${resultMeta.model}`}</p>}
       {error && <p role="alert" className="rounded-xl bg-[var(--rose)]/25 px-4 py-2 text-sm text-[var(--rose-deep)]">{error}</p>}
     </div>
-    <div className="mt-4 grid gap-5 lg:grid-cols-[360px_1fr]">
+    <div className="mt-4 grid gap-5 lg:grid-cols-[320px_minmax(360px,1fr)] xl:grid-cols-[300px_minmax(380px,1fr)_280px]">
       <PromptCard value={prompt} onChange={setPrompt} settings={settings} onSettingsChange={updateSettings} onGenerate={generate} generating={generationState === "generating"}/>
       <section className="panel p-5 sm:p-6">
         <div className="flex items-center justify-between">
@@ -170,6 +173,18 @@ export default function VisualStudioPage() {
         {images.length === 0 && generationState !== "generating" && <div className="mt-5 grid min-h-72 place-items-center rounded-[22px] bg-[var(--cream)] px-6 text-center text-sm text-[var(--muted)]">编辑 Prompt 并生成候选封面。失败时已有候选不会被清空。</div>}
         {images.length > 0 && <p className="mt-4 text-xs text-[var(--muted)]">临时图片可能过期；Phase 3C 不进行永久保存或第三方上传。</p>}
       </section>
+      <ModelStatusPanel
+        title="图片生成模型"
+        eyebrow="Image model"
+        provider={settings.provider === "openai" ? "OpenAI Image" : "Demo / Mock"}
+        model={settings.model}
+        mode={settings.provider === "openai" ? "cloud" : "mock"}
+        configured={settings.provider === "mock" || serverConfigured}
+        statusLabel={settings.provider === "openai" ? "Real API" : "Mock"}
+        details={[
+          { label: "生成摘要", value: `${settings.ratio} · ${settings.quality} · ${settings.candidateCount} 张` },
+        ]}
+      />
     </div>
   </main>;
 }
