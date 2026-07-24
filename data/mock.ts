@@ -25,12 +25,13 @@ export const libraryItems: LibraryItem[] = [
 ].map((v,i) => ({ id:`item-${i}`, title:v[0] as string, category:v[1] as LibraryItem["category"], tags:v[2] as string[], score:v[3] as number, saved:i===1, aspect:v[4] as LibraryItem["aspect"], colors:palette[i] }));
 
 export const workflowSteps: WorkflowStep[] = [
-  { id:"research", name:"Research Agent", subtitle:"趋势与竞品研究", status:"completed", output:"发现 24 个上升趋势", duration:"42s" },
-  { id:"memory", name:"RAG Memory", subtitle:"检索个人风格记忆", status:"completed", output:"匹配 18 条风格偏好", duration:"8s" },
-  { id:"strategy", name:"Strategy Agent", subtitle:"制定内容策略", status:"running", output:"正在组合高匹配选题…" },
-  { id:"writer", name:"Writer Agent", subtitle:"生成标题与正文", status:"waiting" },
-  { id:"visual", name:"Visual Agent", subtitle:"生成封面方向", status:"waiting" },
-  { id:"human", name:"Human Review", subtitle:"由你进行最终确认", status:"waiting" },
+  { id:"research", name:"Research Agent", subtitle:"趋势与竞品研究", model:"DeepSeek-V4", status:"completed", output:"发现 24 个上升趋势", duration:"42s" },
+  { id:"memory", name:"RAG Memory", subtitle:"检索个人风格记忆", model:"CreatorFlow Vector Store", status:"completed", output:"匹配 18 条风格偏好", duration:"8s" },
+  { id:"strategy", name:"Strategy Agent", subtitle:"制定内容策略", model:"DeepSeek-V4", status:"running", output:"正在组合高匹配选题…" },
+  { id:"writer", name:"Writer Agent", subtitle:"生成标题与正文", model:"GPT-4o", status:"waiting" },
+  { id:"visual", name:"Visual Agent", subtitle:"生成封面方向", model:"DALL-E", status:"waiting" },
+  { id:"safety", name:"Safety Guard", subtitle:"内容真实性与平台规范检查", model:"CreatorFlow Guard", status:"waiting" },
+  { id:"human", name:"Human Review", subtitle:"由你进行最终确认", model:"Human", status:"waiting" },
 ];
 
 const topicNames = ["韩系秋冬温柔穿搭","100元平价韩系复刻","首尔女生都在穿的针织衫","小个子显高叠穿公式","奶杏色通勤一周穿搭","咖啡馆约会氛围感","基础款也能穿出韩味","秋日半裙的四种搭法","低饱和衣橱配色指南","周末松弛感出片穿搭"];

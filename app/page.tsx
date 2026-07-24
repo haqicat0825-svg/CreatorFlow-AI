@@ -13,7 +13,7 @@ export default function Dashboard() {
     <section className="mt-10 grid gap-5 lg:grid-cols-[1.55fr_.8fr]">
       <div className="panel relative overflow-hidden !bg-[var(--rose)] p-6 sm:p-8">
         <div className="relative z-10 max-w-xl"><p className="fine !text-[var(--ink)]/60">今日任务 · Friday, Jul 24</p><h2 className="font-display mt-5 text-4xl leading-[1.08] sm:text-5xl">生成一篇<br/>韩系穿搭内容</h2><p className="mt-5 max-w-md text-sm leading-6 text-[var(--ink)]/70">Research Agent 正在整理最新趋势，你的风格记忆与爆款样本已经准备就绪。</p>
-        <div className="mt-8 flex flex-wrap gap-3"><Link className="primary-button inline-flex items-center gap-2" href="/creator">继续创作 <ArrowUpRight size={16}/></Link><span className="soft-button !bg-white/35">3 / 6 steps</span></div></div>
+        <div className="mt-8 flex flex-wrap gap-3"><Link className="primary-button inline-flex items-center gap-2" href="/creator">继续创作 <ArrowUpRight size={16}/></Link><Link className="soft-button !bg-white/35" href="/create-task">创建新任务</Link><span className="soft-button !bg-white/35">3 / 6 steps</span></div></div>
         <div className="absolute -bottom-16 -right-10 h-64 w-64 rounded-full border-[42px] border-white/20"/><SparkleCluster/>
       </div>
       <aside className="panel p-6">

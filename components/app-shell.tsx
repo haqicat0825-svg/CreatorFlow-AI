@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bot, House, Images, Network, PenLine, Sparkles, UserRound } from "lucide-react";
+import { Bot, Cpu, House, Images, Network, PenLine, Sparkles, UserRound } from "lucide-react";
 
 const nav = [
   { href: "/", label: "首页", icon: House },
@@ -10,6 +10,7 @@ const nav = [
   { href: "/workflow", label: "Agent 流程", icon: Network },
   { href: "/creator", label: "内容创作", icon: PenLine },
   { href: "/visual-studio", label: "视觉工作室", icon: Sparkles },
+  { href: "/models", label: "Model Hub", icon: Cpu },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -27,10 +28,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <button aria-label="用户账户" className="grid h-11 w-11 place-items-center rounded-full border border-[var(--line)] bg-white"><UserRound size={18}/></button>
       </aside>
       <div className="min-h-screen pb-24 md:ml-[88px] md:pb-0">{children}</div>
-      <nav className="fixed inset-x-3 bottom-3 z-40 flex justify-around rounded-[24px] border border-[var(--line)] bg-[rgba(255,253,249,.94)] p-2 shadow-2xl backdrop-blur-xl md:hidden">
+      <nav className="fixed inset-x-3 bottom-3 z-40 flex justify-start gap-2 overflow-x-auto rounded-[24px] border border-[var(--line)] bg-[rgba(255,253,249,.94)] p-2 shadow-2xl backdrop-blur-xl md:hidden">
         {nav.map(({ href, label, icon: Icon }) => {
           const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
-          return <Link key={href} href={href} aria-label={label} className={`grid h-11 w-11 place-items-center rounded-2xl ${active ? "bg-[var(--rose)]" : "text-[var(--muted)]"}`}><Icon size={19}/></Link>;
+          return <Link key={href} href={href} aria-label={label} className={`grid h-11 min-w-11 place-items-center rounded-2xl ${active ? "bg-[var(--rose)]" : "text-[var(--muted)]"}`}><Icon size={19}/></Link>;
         })}
       </nav>
     </div>
