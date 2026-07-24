@@ -3,6 +3,8 @@ import { useMemo, useState } from "react";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { ContentCard } from "@/components/content-card";
 import { PageHeader } from "@/components/page-header";
+import { KnowledgeLibrary } from "@/components/knowledge-library";
+import { ResearchLibrary } from "@/components/research-library";
 import { libraryItems } from "@/data/mock";
 import type { LibraryItem } from "@/lib/types";
 
@@ -16,6 +18,8 @@ export default function LibraryPage() {
   const toggle=(id:string)=>setSaved(prev=>{const next=new Set(prev);next.has(id)?next.delete(id):next.add(id);return next});
   return <main className="mx-auto max-w-[1440px] px-5 py-8 sm:px-8 lg:px-12 lg:py-10">
     <PageHeader eyebrow="AI Content Assets" title="Content Intelligence Library" description="把灵感、爆款结构和个人风格整理成可被 AI 团队反复使用的内容记忆。"/>
+    <ResearchLibrary/>
+    <KnowledgeLibrary/>
     <div className="mt-9 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
       <div className="flex gap-2 overflow-x-auto pb-1">{cats.map(c=><button key={c} onClick={()=>setCategory(c)} className={`whitespace-nowrap rounded-full px-4 py-2 text-sm font-semibold ${category===c?"bg-[var(--ink)] text-white":"border border-[var(--line)] bg-white/60"}`}>{c}</button>)}</div>
       <label className="flex min-w-[290px] items-center gap-2 rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-2.5"><Search size={16}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="搜索标题或 AI 标签" className="w-full bg-transparent text-sm outline-none"/><SlidersHorizontal size={15}/></label>

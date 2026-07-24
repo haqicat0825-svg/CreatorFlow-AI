@@ -12,7 +12,7 @@ export default function Dashboard() {
 
     <section className="mt-10 grid gap-5 lg:grid-cols-[1.55fr_.8fr]">
       <div className="panel relative overflow-hidden !bg-[var(--rose)] p-6 sm:p-8">
-        <div className="relative z-10 max-w-xl"><p className="fine !text-[var(--ink)]/60">今日任务 · Friday, Jul 24</p><h2 className="font-display mt-5 text-4xl leading-[1.08] sm:text-5xl">生成一篇<br/>韩系穿搭内容</h2><p className="mt-5 max-w-md text-sm leading-6 text-[var(--ink)]/70">Research Agent 正在整理最新趋势，你的风格记忆与爆款样本已经准备就绪。</p>
+        <div className="relative z-10 max-w-xl"><p className="fine !text-[var(--ink)]/60">今日任务 · Friday, Jul 24</p><h2 className="font-display mt-5 text-4xl leading-[1.08] sm:text-5xl">生成一篇<br/>韩系穿搭内容</h2><p className="mt-5 max-w-md text-sm leading-6 text-[var(--ink)]/70">Research Beta 支持受控的只读 CLI 搜索；该能力不影响 CreatorFlow MVP 核心内容生产流程。</p>
         <div className="mt-8 flex flex-wrap gap-3"><Link className="primary-button inline-flex items-center gap-2" href="/creator">继续创作 <ArrowUpRight size={16}/></Link><Link className="soft-button !bg-white/35" href="/create-task">创建新任务</Link><span className="soft-button !bg-white/35">3 / 6 steps</span></div></div>
         <div className="absolute -bottom-16 -right-10 h-64 w-64 rounded-full border-[42px] border-white/20"/><SparkleCluster/>
       </div>
@@ -20,7 +20,7 @@ export default function Dashboard() {
         <div className="flex items-center justify-between"><div><p className="fine">Content rhythm</p><h2 className="mt-2 text-xl font-bold">本周节奏</h2></div><CalendarDays size={20}/></div>
         <div className="mt-7 grid grid-cols-7 gap-2">{["M","T","W","T","F","S","S"].map((d,i)=><div key={i} className={`grid aspect-square place-items-center rounded-full text-xs ${i===4?"bg-[var(--ink)] text-white":i<4?"bg-[var(--almond)]":"text-[var(--muted)]"}`}>{d}</div>)}</div>
         <div className="mt-7 space-y-4">
-          <div className="flex gap-3"><Check className="mt-0.5 rounded-full bg-[var(--sage)] p-1 text-white" size={20}/><div><p className="text-sm font-semibold">趋势研究</p><p className="text-xs text-[var(--muted)]">已完成 · 10:24</p></div></div>
+          <div className="flex gap-3"><Check className="mt-0.5 rounded-full bg-[var(--sage)] p-1 text-white" size={20}/><div><p className="text-sm font-semibold">Demo/Mock 趋势研究</p><p className="text-xs text-[var(--muted)]">演示流程已完成 · 非真实平台搜索</p></div></div>
           <div className="flex gap-3"><Clock3 className="mt-0.5 rounded-full bg-[var(--almond)] p-1" size={20}/><div><p className="text-sm font-semibold">内容初稿</p><p className="text-xs text-[var(--muted)]">预计 14:30</p></div></div>
         </div>
       </aside>

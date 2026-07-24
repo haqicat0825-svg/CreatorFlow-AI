@@ -3,3 +3,32 @@ node_modules/
 .next/
 playwright-report/
 test-results/
+.env*.local
+.creatorflow-data/*
+!.creatorflow-data/README.md
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies and Next.js build output
+node_modules/
+.next/
+
+# TypeScript build cache
+*.tsbuildinfo
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# CreatorFlow local runtime data
+.creatorflow-data/*
+!.creatorflow-data/README.md

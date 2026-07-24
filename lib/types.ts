@@ -6,10 +6,18 @@ export type WorkflowStep = { id: string; name: string; subtitle: string; status:
 export type Draft = { title: string; body: string; tags: string[]; coverColors: [string, string, string] };
 export type Topic = { id: string; label: string; title: string; match: number; tags: string[]; draft: Draft };
 export type CoverCandidate = { id: string; alt: string; composition: string; colors: [string, string, string] };
-export type ModelProvider = "local-cli" | "cloud-api" | "dall-e" | "flux" | "stable-diffusion";
-export type ModelConfig = { id: string; kind: "text" | "image"; name: string; provider: ModelProvider; apiKey: string; baseUrl: string; status: "connected" | "disconnected" };
+export type ModelProvider = "local-cli" | "cloud-api" | "openai" | "mock";
+export type ModelConfig = { id: string; kind: "text" | "image"; name: string; provider: ModelProvider; mode: "cloud" | "local-cli" | "image"; status: "connected" | "disconnected" };
 export type ContentGoal = "涨粉" | "种草" | "品牌推广";
 export type ContentTask = { topic: string; audiences: string[]; styles: string[]; goal: ContentGoal; useIntelligence: boolean };
 export type TitleCandidate = { id: string; title: string; match: number };
 export type SafetyCheck = { id: string; label: string; status: "passed" | "review" };
-export type SafetyReport = { score: number; checks: SafetyCheck[] };
+export type CopyingRisk = {
+  status: "passed" | "review";
+  titleExactMatch: boolean;
+  titleHighSimilarity: boolean;
+  bodyLongOverlap: boolean;
+  regenerated: boolean;
+  warning?: string;
+};
+export type SafetyReport = { score: number; checks: SafetyCheck[]; copyingRisk: CopyingRisk };

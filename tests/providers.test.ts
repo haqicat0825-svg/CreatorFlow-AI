@@ -21,7 +21,8 @@ describe("mock model adapters", () => {
     const visual = await mockImageAdapter.generatePrompt(task);
     const content = await mockTextAdapter.generate(task);
     expect(visual.prompt).toContain("秋季韩系穿搭");
-    expect(content.safety.score).toBe(92);
-    expect(content.safety.checks).toHaveLength(4);
+    expect(content).toMatchObject({ isMock: true });
+    expect((content as Awaited<ReturnType<typeof mockTextAdapter.generate>> & { safetyReport: { score: number; checks: unknown[] } }).safetyReport.score).toBe(92);
+    expect((content as Awaited<ReturnType<typeof mockTextAdapter.generate>> & { safetyReport: { score: number; checks: unknown[] } }).safetyReport.checks).toHaveLength(4);
   });
 });
