@@ -2,9 +2,10 @@ export type KnowledgeSourceType = "manual" | "article" | "note" | "other";
 export type KnowledgeContentType = "case-study" | "style-guide" | "title-formula" | "reference";
 export type KnowledgeQualityStatus = "draft" | "approved" | "rejected";
 export type KnowledgeAuthenticityStatus = "unverified" | "verified" | "disputed";
+export type KnowledgeResearchPlatform = "xiaohongshu" | "tavily";
 
 export type KnowledgeResearchMetadata = {
-  platform: "xiaohongshu";
+  platform: KnowledgeResearchPlatform;
   researchQuery: string;
   retrievedAt: string;
   isMock: boolean;

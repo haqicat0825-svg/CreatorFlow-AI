@@ -1,5 +1,6 @@
 export type ResearchErrorCode =
   | "CLI_UNAVAILABLE"
+  | "CONFIGURATION_MISSING"
   | "LOGIN_REQUIRED"
   | "INVALID_REQUEST"
   | "RATE_LIMITED"

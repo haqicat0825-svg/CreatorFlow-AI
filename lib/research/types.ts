@@ -26,7 +26,7 @@ export type SearchResult = {
   thumbnailUrl?: string;
   metrics?: SearchMetrics;
   tags: string[];
-  source: "xiaohongshu";
+  source: "xiaohongshu" | "tavily";
   retrievedAt: string;
   isMock: boolean;
 };
@@ -34,7 +34,7 @@ export type SearchResult = {
 export type LoginStatus = {
   available: boolean;
   loggedIn: boolean;
-  provider: "xiaohongshu-cli" | "mock";
+  provider: "xiaohongshu-cli" | "tavily" | "mock";
   safeMessage: string;
 };
 

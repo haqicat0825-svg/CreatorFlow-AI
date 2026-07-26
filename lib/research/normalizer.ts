@@ -55,6 +55,9 @@ export function validateSearchResult(input: unknown): SearchResult {
   const metrics = value.metrics && typeof value.metrics === "object"
     ? Object.fromEntries(Object.entries(value.metrics).filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1])))
     : undefined;
+  if (!["xiaohongshu", "tavily"].includes(String(value.source))) {
+    throw new ResearchError("INVALID_RESPONSE", "搜索结果来源无效。", 502);
+  }
   return {
     id: String(value.id).slice(0, 200),
     title: String(value.title).trim().slice(0, 200),
@@ -65,7 +68,7 @@ export function validateSearchResult(input: unknown): SearchResult {
     thumbnailUrl: typeof value.thumbnailUrl === "string" ? value.thumbnailUrl : undefined,
     metrics: metrics && Object.keys(metrics).length ? metrics : undefined,
     tags: Array.isArray(value.tags) ? value.tags.filter((tag): tag is string => typeof tag === "string").slice(0, 20) : [],
-    source: "xiaohongshu",
+    source: value.source as SearchResult["source"],
     retrievedAt: String(value.retrievedAt),
     isMock: value.isMock === true,
   };

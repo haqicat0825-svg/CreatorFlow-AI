@@ -197,7 +197,7 @@ function validateCreateInput(input: CreateKnowledgeItemInput): CreateKnowledgeIt
 function validateResearchMetadata(research: CreateKnowledgeItemInput["research"]) {
   if (!research) return undefined;
   if (
-    research.platform !== "xiaohongshu"
+    !["xiaohongshu", "tavily"].includes(research.platform)
     || typeof research.researchQuery !== "string"
     || !research.researchQuery.trim()
     || research.researchQuery.length > 80
@@ -212,7 +212,7 @@ function validateResearchMetadata(research: CreateKnowledgeItemInput["research"]
     )))
     : undefined;
   return {
-    platform: "xiaohongshu" as const,
+    platform: research.platform,
     researchQuery: research.researchQuery.trim(),
     retrievedAt: research.retrievedAt,
     isMock: research.isMock,

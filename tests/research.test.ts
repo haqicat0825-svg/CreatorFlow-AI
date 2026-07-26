@@ -34,6 +34,14 @@ const realResult = {
   isMock: false,
 };
 
+const tavilyResult = {
+  ...realResult,
+  id: "tavily-1",
+  title: "Tavily research result",
+  sourceUrl: "https://example.com/tavily-result",
+  source: "tavily" as const,
+};
+
 describe("research safety", () => {
   it("reports a safe unauthenticated CLI status without exposing identity or credentials", async () => {
     expect(XIAOHONGSHU_CLI_AUDIT.available).toBe(true);
@@ -150,6 +158,18 @@ describe("research safety", () => {
       sourceUrl: realResult.sourceUrl,
       qualityStatus: "approved",
       research: expect.objectContaining({ platform: "xiaohongshu", isMock: false }),
+    }));
+  });
+
+  it("preserves the Tavily source when importing a selected result", async () => {
+    const result = await importSelectedResearch({ query: "trend research", selected: [tavilyResult] }, repository);
+
+    expect(result.results[0].status).toBe("imported");
+    expect((await repository.list())[0]).toEqual(expect.objectContaining({
+      sourceUrl: tavilyResult.sourceUrl,
+      qualityStatus: "approved",
+      authenticityStatus: "verified",
+      research: expect.objectContaining({ platform: "tavily", isMock: false }),
     }));
   });
 

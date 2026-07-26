@@ -46,6 +46,22 @@ describe("FileKnowledgeRepository", () => {
     expect((await readdir(directory)).filter(name => name.endsWith(".tmp"))).toEqual([]);
   });
 
+  it("preserves supported research platforms", async () => {
+    const created = await repository.create({
+      ...input,
+      sourceType: "article",
+      sourceUrl: "https://example.com/research",
+      research: {
+        platform: "tavily",
+        researchQuery: "trend research",
+        retrievedAt: "2026-07-26T00:00:00.000Z",
+        isMock: false,
+      },
+    });
+
+    expect(created.research?.platform).toBe("tavily");
+  });
+
   it("round-trips Chinese punctuation and emoji through UTF-8 storage", async () => {
     const created = await repository.create(unicodeInput);
     const raw = await readFile(path.join(directory, "knowledge.json"), "utf8");

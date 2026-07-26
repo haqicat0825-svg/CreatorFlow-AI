@@ -36,7 +36,7 @@ export async function importSelectedResearch(
         qualityStatus: item.isMock ? "draft" : "approved",
         authenticityStatus: item.isMock ? "unverified" : "verified",
         research: {
-          platform: "xiaohongshu",
+          platform: item.source,
           researchQuery: input.query.trim(),
           retrievedAt: item.retrievedAt,
           isMock: item.isMock,
