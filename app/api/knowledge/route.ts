@@ -44,7 +44,14 @@ export async function POST(request: Request) {
 function knowledgeErrorResponse(error: unknown) {
   if (error instanceof KnowledgeRepositoryError) {
     const status = error.code === "DUPLICATE" ? 409 : error.code === "NOT_FOUND" ? 404 : error.code === "INVALID_INPUT" ? 400 : 500;
-    return NextResponse.json({ success: false, error: { code: error.code, message: error.message } }, { status });
+    return NextResponse.json({
+      success: false,
+      error: {
+        code: error.code,
+        message: error.message,
+        ...(error.existingId ? { existingId: error.existingId } : {}),
+      },
+    }, { status });
   }
   return NextResponse.json({ success: false, error: { code: "INTERNAL_ERROR", message: "知识库暂时不可用。" } }, { status: 500 });
 }

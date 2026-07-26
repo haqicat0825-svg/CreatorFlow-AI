@@ -8,6 +8,7 @@ export class KnowledgeRepositoryError extends Error {
   constructor(
     public readonly code: "DUPLICATE" | "NOT_FOUND" | "INVALID_INPUT" | "STORAGE_ERROR",
     message: string,
+    public readonly existingId?: string,
   ) {
     super(message);
     this.name = "KnowledgeRepositoryError";
@@ -17,7 +18,10 @@ export class KnowledgeRepositoryError extends Error {
 export class FileKnowledgeRepository {
   private writeQueue: Promise<void> = Promise.resolve();
 
-  constructor(private readonly filePath = getKnowledgeFilePath()) {}
+  constructor(
+    private readonly filePath = getKnowledgeFilePath(),
+    private readonly replaceFile: typeof rename = rename,
+  ) {}
 
   async create(input: CreateKnowledgeItemInput) {
     const safe = validateCreateInput(input);
@@ -25,7 +29,9 @@ export class FileKnowledgeRepository {
     await this.withWriteLock(async () => {
       const items = await this.readAll();
       const duplicate = findDuplicate(items, safe);
-      if (duplicate) throw new KnowledgeRepositoryError("DUPLICATE", "相同知识条目已存在。");
+      if (duplicate) {
+        throw new KnowledgeRepositoryError("DUPLICATE", "相同知识条目已存在。", duplicate.id);
+      }
       const now = new Date().toISOString();
       created = {
         ...safe,
@@ -84,7 +90,7 @@ export class FileKnowledgeRepository {
       temporary = path.join(directory, `.${path.basename(this.filePath)}.${process.pid}.${Date.now()}.tmp`);
       await writeFile(temporary, serialized, { encoding: "utf8", mode: 0o600, flag: "wx" });
       validateSerializedRepository(await readFile(temporary, "utf8"));
-      await rename(temporary, this.filePath);
+      await this.replaceFile(temporary, this.filePath);
       temporary = undefined;
     } catch {
       throw new KnowledgeRepositoryError("STORAGE_ERROR", "无法写入本地知识库。");

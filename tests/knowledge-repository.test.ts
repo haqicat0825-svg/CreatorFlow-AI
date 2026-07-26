@@ -17,6 +17,16 @@ const input = {
   authenticityStatus: "verified" as const,
 };
 
+const unicodeInput = {
+  title: "韩系秋季针织穿搭参考🎀",
+  content: "奶油白针织衫＋深色半裙，下午自然光，适合咖啡店场景。",
+  sourceType: "manual" as const,
+  tags: ["韩系穿搭", "秋季", "针织衫"],
+  contentType: "reference" as const,
+  qualityStatus: "approved" as const,
+  authenticityStatus: "verified" as const,
+};
+
 beforeEach(async () => {
   directory = await mkdtemp(path.join(os.tmpdir(), "creatorflow-knowledge-"));
   repository = new FileKnowledgeRepository(path.join(directory, "knowledge.json"));
@@ -36,10 +46,27 @@ describe("FileKnowledgeRepository", () => {
     expect((await readdir(directory)).filter(name => name.endsWith(".tmp"))).toEqual([]);
   });
 
+  it("round-trips Chinese punctuation and emoji through UTF-8 storage", async () => {
+    const created = await repository.create(unicodeInput);
+    const raw = await readFile(path.join(directory, "knowledge.json"), "utf8");
+    const reopened = new FileKnowledgeRepository(path.join(directory, "knowledge.json"));
+
+    expect(created).toMatchObject(unicodeInput);
+    expect(JSON.parse(raw)).toEqual([created]);
+    expect(await reopened.list()).toEqual([created]);
+  });
+
   it("rejects normalized duplicates", async () => {
-    await repository.create(input);
-    await expect(repository.create({ ...input, title: " 秋季 韩系穿搭结构 ", content: "先描述具体场景，再给出三条可执行搭配建议，避免绝对化营销语言。" }))
-      .rejects.toMatchObject<KnowledgeRepositoryError>({ code: "DUPLICATE" });
+    const created = await repository.create(unicodeInput);
+    await expect(repository.create({
+      ...unicodeInput,
+      title: "  韩系秋季针织穿搭参考🎀  ",
+      content: "奶油白针织衫＋深色半裙，\r\n下午自然光，  适合咖啡店场景。",
+    })).rejects.toMatchObject<KnowledgeRepositoryError>({
+      code: "DUPLICATE",
+      existingId: created.id,
+    });
+    expect(await repository.list()).toEqual([created]);
   });
 
   it("ranks approved keyword and tag matches and excludes drafts", async () => {
