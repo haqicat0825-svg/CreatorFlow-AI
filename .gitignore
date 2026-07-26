@@ -32,3 +32,4 @@ temp/
 # CreatorFlow local runtime data
 .creatorflow-data/*
 !.creatorflow-data/README.md
+.vercel
