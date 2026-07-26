@@ -1,5 +1,6 @@
 "use client";
 import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Search, SlidersHorizontal, X } from "lucide-react";
 import { ContentCard } from "@/components/content-card";
 import { PageHeader } from "@/components/page-header";
@@ -7,19 +8,30 @@ import { KnowledgeLibrary } from "@/components/knowledge-library";
 import { ResearchLibrary } from "@/components/research-library";
 import { libraryItems } from "@/data/mock";
 import type { LibraryItem } from "@/lib/types";
+import type { TopicCandidate, TrendAnalysisResult } from "@/lib/analysis/types";
+import { storeTrendSelectionForCreator } from "@/lib/content/task-envelope";
 import { segmentedControlClass } from "@/lib/ui/segmented-control";
 
 const cats = ["全部","爆款案例","我的风格","标题公式","视觉素材"] as const;
 export default function LibraryPage() {
+  const router = useRouter();
   const [category,setCategory]=useState<(typeof cats)[number]>("全部");
   const [query,setQuery]=useState("");
   const [saved,setSaved]=useState(()=>new Set(libraryItems.filter(i=>i.saved).map(i=>i.id)));
   const [selected,setSelected]=useState<LibraryItem|null>(null);
   const filtered=useMemo(()=>libraryItems.filter(i=>(category==="全部"||i.category===category)&&(`${i.title} ${i.tags.join(" ")}`.toLowerCase().includes(query.toLowerCase()))),[category,query]);
   const toggle=(id:string)=>setSaved(prev=>{const next=new Set(prev);next.has(id)?next.delete(id):next.add(id);return next});
+  const useTopic = (topic: TopicCandidate, result: TrendAnalysisResult) => {
+    const destination = storeTrendSelectionForCreator(
+      window.sessionStorage,
+      result,
+      topic,
+    );
+    router.push(destination);
+  };
   return <main className="mx-auto max-w-[1440px] px-5 py-8 sm:px-8 lg:px-12 lg:py-10">
     <PageHeader eyebrow="AI Content Assets" title="Content Intelligence Library" description="把灵感、爆款结构和个人风格整理成可被 AI 团队反复使用的内容记忆。"/>
-    <ResearchLibrary/>
+    <ResearchLibrary onUseTopic={useTopic}/>
     <KnowledgeLibrary/>
     <div className="mt-9 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
       <div className="flex gap-2 overflow-x-auto pb-1">{cats.map(c=><button key={c} aria-pressed={category===c} onClick={()=>setCategory(c)} className={`whitespace-nowrap ${segmentedControlClass(category===c)}`}>{c}</button>)}</div>

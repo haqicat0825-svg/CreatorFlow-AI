@@ -16,8 +16,17 @@ const successPayload = {
   },
 };
 
+const legacyBrief = {
+  topic: "秋季穿搭",
+  audiences: ["18-25岁女生"],
+  styles: ["韩系甜美"],
+  goal: "种草",
+  useIntelligence: true,
+};
+
 beforeEach(() => {
   window.sessionStorage.clear();
+  window.sessionStorage.setItem("creatorflow-task", JSON.stringify(legacyBrief));
   vi.restoreAllMocks();
 });
 

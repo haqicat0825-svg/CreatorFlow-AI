@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { modelErrorResponse } from "@/lib/api/model-errors";
-import { parseContentBrief } from "@/lib/content/validation";
+import { parseContentRequest } from "@/lib/content/validation";
 import { getServerTextModelConfig } from "@/lib/models/config-server";
 import { createTextAdapter } from "@/lib/providers/factory";
 import { buildRagContext } from "@/lib/knowledge/rag";
@@ -10,8 +10,9 @@ export const runtime = "nodejs";
 
 export async function POST(request: Request) {
   let brief;
+  let trendContext;
   try {
-    brief = parseContentBrief(await request.json());
+    ({ brief, trendContext } = parseContentRequest(await request.json()));
   } catch (error) {
     return NextResponse.json(
       { success: false, error: { code: "INVALID_REQUEST", message: error instanceof Error ? error.message : "请求无效。" } },
@@ -23,7 +24,7 @@ export async function POST(request: Request) {
     const config = getServerTextModelConfig();
     const adapter = createTextAdapter(config);
     const rag = await buildRagContext(brief);
-    const { parsed, safetyReport } = await generateWithCopyingGuard(adapter, brief, rag);
+    const { parsed, safetyReport } = await generateWithCopyingGuard(adapter, brief, rag, trendContext);
     const generatedContent = {
       ...parsed,
       safetyReport,

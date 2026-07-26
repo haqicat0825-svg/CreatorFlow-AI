@@ -2,17 +2,27 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { ExternalLink, Search } from "lucide-react";
+import { TrendAnalysisPanel } from "@/components/trend-analysis-panel";
+import type { TopicCandidate, TrendAnalysisResult } from "@/lib/analysis/types";
 import type { LoginStatus, SearchResult } from "@/lib/research/types";
 
-export function ResearchLibrary() {
+type AnalysisStatus = "idle" | "searching" | "importing" | "analyzing";
+
+type ResearchLibraryProps = {
+  onUseTopic?: (topic: TopicCandidate, result: TrendAnalysisResult) => void;
+};
+
+export function ResearchLibrary({ onUseTopic }: ResearchLibraryProps = {}) {
   const [status, setStatus] = useState<LoginStatus>();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [busy, setBusy] = useState(false);
+  const [analysisStatus, setAnalysisStatus] = useState<AnalysisStatus>("idle");
+  const [analysis, setAnalysis] = useState<TrendAnalysisResult>();
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const realSearchAvailable = Boolean(status?.available && status.loggedIn);
+  const busy = analysisStatus !== "idle";
 
   useEffect(() => {
     void fetch("/api/research/status", { cache: "no-store" })
@@ -23,7 +33,8 @@ export function ResearchLibrary() {
 
   const search = async (event: FormEvent) => {
     event.preventDefault();
-    setBusy(true);
+    setAnalysisStatus("searching");
+    setAnalysis(undefined);
     setError("");
     setMessage("");
     setSelected(new Set());
@@ -41,14 +52,14 @@ export function ResearchLibrary() {
       setResults([]);
       setError(cause instanceof Error ? cause.message : "搜索失败。");
     } finally {
-      setBusy(false);
+      setAnalysisStatus("idle");
     }
   };
 
   const importSelected = async () => {
     const chosen = results.filter(result => selected.has(result.id));
     if (!chosen.length || !window.confirm(`确认将选中的 ${chosen.length} 条研究结果加入本地知识库？`)) return;
-    setBusy(true);
+    setAnalysisStatus("importing");
     setError("");
     setMessage("");
     try {
@@ -67,15 +78,42 @@ export function ResearchLibrary() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "入库失败。");
     } finally {
-      setBusy(false);
+      setAnalysisStatus("idle");
     }
   };
 
-  const toggle = (id: string) => setSelected(previous => {
-    const next = new Set(previous);
-    next.has(id) ? next.delete(id) : next.add(id);
-    return next;
-  });
+  const toggle = (id: string) => {
+    setAnalysis(undefined);
+    setSelected(previous => {
+      const next = new Set(previous);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const analyzeTrends = async () => {
+    const selectedResults = results.filter(result => selected.has(result.id));
+    if (!selectedResults.length) return;
+    setAnalysisStatus("analyzing");
+    setAnalysis(undefined);
+    setError("");
+    setMessage("");
+    try {
+      const response = await fetch("/api/research/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query, selectedResults }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error?.message ?? "趋势分析失败。");
+      setAnalysis(payload.data);
+    } catch (cause) {
+      setAnalysis(undefined);
+      setError(cause instanceof Error ? cause.message : "趋势分析失败。");
+    } finally {
+      setAnalysisStatus("idle");
+    }
+  };
 
   return <section className="panel mt-7 overflow-hidden">
     <div className="p-5 sm:p-6">
@@ -90,7 +128,7 @@ export function ResearchLibrary() {
       <p className="mt-3 text-xs leading-5 text-[var(--muted)]">{status?.safeMessage ?? "正在检查 CLI 状态…"}</p>
       <form onSubmit={search} className="mt-5 flex flex-col gap-3 sm:flex-row">
         <label className="flex flex-1 items-center gap-2 rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-2.5"><Search size={16}/><input required maxLength={80} value={query} onChange={event => setQuery(event.target.value)} placeholder="输入关键词后手动搜索" className="w-full bg-transparent text-sm outline-none"/></label>
-        <button disabled={busy || !query.trim()} className="primary-button disabled:cursor-not-allowed disabled:opacity-45">{busy ? "处理中…" : "搜索"}</button>
+        <button disabled={busy || !query.trim()} className="primary-button disabled:cursor-not-allowed disabled:opacity-45">{analysisStatus === "searching" ? "搜索中…" : "搜索"}</button>
       </form>
     </div>
     {(error || message) && <p role={error ? "alert" : "status"} className={`mx-5 mb-4 rounded-xl px-4 py-2 text-sm sm:mx-6 ${error ? "bg-[var(--rose)]/25 text-[var(--rose-deep)]" : "bg-[var(--cream)] text-[var(--muted)]"}`}>{error || message}</p>}
@@ -103,7 +141,14 @@ export function ResearchLibrary() {
           <span className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-[var(--muted)]">{result.author && <span>作者：{result.author}</span>}{result.publishedAt && <span>发布：{result.publishedAt}</span>}<a href={result.sourceUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1">来源 <ExternalLink size={11}/></a></span>
         </span>
       </label>)}</div>
-      <div className="flex items-center justify-between gap-3 border-t border-[var(--line)] p-5 sm:px-6"><span className="text-xs text-[var(--muted)]">已选择 {selected.size} 条</span><button type="button" disabled={busy || selected.size === 0} onClick={importSelected} className="primary-button disabled:cursor-not-allowed disabled:opacity-45">加入知识库</button></div>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] p-5 sm:px-6">
+        <span className="text-xs text-[var(--muted)]">已选择 {selected.size} 条</span>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" disabled={busy || selected.size === 0} onClick={analyzeTrends} className="rounded-full border border-[var(--ink)] px-4 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-45">{analysisStatus === "analyzing" ? "分析中…" : "分析趋势"}</button>
+          <button type="button" disabled={busy || selected.size === 0} onClick={importSelected} className="primary-button disabled:cursor-not-allowed disabled:opacity-45">{analysisStatus === "importing" ? "入库中…" : "加入知识库"}</button>
+        </div>
+      </div>
+      {analysis && <TrendAnalysisPanel result={analysis} onUseTopic={onUseTopic}/>}
     </div>}
   </section>;
 }

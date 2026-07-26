@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { createOpenAICompatibleTextAdapter } from "@/lib/providers/openai-compatible-text";
+import { validTrendContext } from "./fixtures/trend-context";
 
 describe("OpenAI-compatible RAG injection", () => {
   it("injects retrieved knowledge as delimited reference material", async () => {
@@ -28,5 +29,30 @@ describe("OpenAI-compatible RAG injection", () => {
     expect(body.messages[0].content).toContain("Do not invent prices, locations, effects, or engagement metrics");
     expect(body.messages[0].content).toContain("Reorganize all content from the Content Brief");
     expect(userMessage).toContain("[来源 1｜参考]");
+  });
+
+  it("keeps validated trend analysis separate from RAG context", async () => {
+    const fetcher = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      choices: [{ message: { content: "{\"ok\":true}" } }],
+    }), { status: 200 }));
+    const adapter = createOpenAICompatibleTextAdapter({
+      provider: "openai",
+      mode: "cloud",
+      model: "gpt-test",
+      baseUrl: "https://api.openai.com/v1",
+      hasApiKey: true,
+      apiKey: "server-secret",
+    }, { fetch: fetcher });
+    await adapter.generate(
+      { topic: "秋季穿搭", audiences: ["通勤女性"], styles: ["简约"], goal: "种草", useIntelligence: true },
+      { trendContext: validTrendContext, ragContext: "Private knowledge reference" },
+    );
+    const body = JSON.parse(String((fetcher.mock.calls[0][1] as RequestInit).body));
+    const userMessage = body.messages[1].content;
+    expect(userMessage).toContain("<trend_context>");
+    expect(userMessage).toContain("</trend_context>");
+    expect(userMessage).toContain("<knowledge>");
+    expect(userMessage.indexOf("<trend_context>")).toBeLessThan(userMessage.indexOf("<knowledge>"));
+    expect(userMessage).not.toContain(validTrendContext.sourceReferences[0].sourceUrl);
   });
 });

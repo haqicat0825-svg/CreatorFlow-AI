@@ -1,12 +1,13 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { POST } from "@/app/api/generate/content/route";
+import { validTrendContext } from "./fixtures/trend-context";
 
 const validBrief = {
   topic: "秋季穿搭",
   audiences: ["18-25岁女生"],
   styles: ["韩系甜美"],
   goal: "种草",
-  useIntelligence: true,
+  useIntelligence: false,
 };
 
 function request(body: unknown) {
@@ -48,6 +49,13 @@ describe("POST /api/generate/content", () => {
         safetyReport: { copyingRisk: { status: "passed" } },
       },
     });
+  });
+
+  it("accepts the new brief plus TrendContext request envelope", async () => {
+    process.env.CREATORFLOW_TEXT_PROVIDER = "mock";
+    const response = await POST(request({ brief: validBrief, trendContext: validTrendContext }));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ success: true, data: { isMock: true } });
   });
 
   it("returns configuration missing without exposing secrets", async () => {

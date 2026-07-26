@@ -1,5 +1,6 @@
 import type { ContentTask, SafetyReport, TitleCandidate } from "@/lib/types";
 import type { KnowledgeCitation } from "@/lib/knowledge/types";
+import type { TrendContext } from "@/lib/content/trend-context";
 
 export type GeneratedContent = {
   titles: TitleCandidate[];
@@ -24,6 +25,7 @@ export interface TextModelAdapter {
   testConnection(): Promise<TextConnectionResult>;
   generate(task: ContentTask, options?: {
     ragContext?: string;
+    trendContext?: TrendContext;
     copyingRiskRetry?: boolean;
   }): Promise<unknown>;
 }

@@ -1,9 +1,15 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, BookOpen, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { PageHeader } from "@/components/page-header";
 import { TagSelector } from "@/components/tag-selector";
+import {
+  CREATOR_TASK_STORAGE_KEY,
+  PENDING_TREND_SELECTION_STORAGE_KEY,
+  parsePendingTrendSelection,
+  type PendingTrendSelection,
+} from "@/lib/content/task-envelope";
 import type { ContentGoal, ContentTask } from "@/lib/types";
 
 const audiences = ["18-25岁女生", "学生党", "职场女性", "穿搭爱好者"];
@@ -18,10 +24,39 @@ export default function CreateTaskPage() {
   const [goal, setGoal] = useState<ContentGoal>("种草");
   const [useIntelligence, setUseIntelligence] = useState(true);
   const [error, setError] = useState("");
+  const [pendingTrend, setPendingTrend] = useState<PendingTrendSelection>();
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem(PENDING_TREND_SELECTION_STORAGE_KEY);
+    if (!stored) return;
+    try {
+      const pending = parsePendingTrendSelection(stored);
+      setPendingTrend(pending);
+      setTopic(pending.topic);
+      setAudiences([]);
+      setStyles([]);
+    } catch {
+      sessionStorage.removeItem(PENDING_TREND_SELECTION_STORAGE_KEY);
+    }
+  }, []);
+
   const submit = () => {
     if (!topic.trim()) return setError("请输入内容主题");
+    if (!selectedAudiences.length || !selectedStyles.length) {
+      return setError("请确认目标用户和内容风格");
+    }
     const task: ContentTask = { topic: topic.trim(), audiences: selectedAudiences, styles: selectedStyles, goal, useIntelligence };
-    sessionStorage.setItem("creatorflow-task", JSON.stringify(task));
+    sessionStorage.setItem(
+      CREATOR_TASK_STORAGE_KEY,
+      JSON.stringify(pendingTrend
+        ? {
+            schemaVersion: "1",
+            brief: task,
+            trendContext: pendingTrend.trendContext,
+          }
+        : task),
+    );
+    sessionStorage.removeItem(PENDING_TREND_SELECTION_STORAGE_KEY);
     router.push("/creator");
   };
   return <main className="mx-auto max-w-[1180px] px-5 py-8 sm:px-8 lg:px-12 lg:py-10">

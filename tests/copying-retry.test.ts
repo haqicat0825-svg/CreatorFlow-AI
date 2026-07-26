@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { generateWithCopyingGuard } from "@/lib/content/generate-with-copying";
 import type { TextModelAdapter } from "@/lib/providers/types";
+import { validTrendContext } from "./fixtures/trend-context";
 
 const brief = {
   topic: "秋季穿搭",
@@ -64,11 +65,14 @@ function adapterWith(...outputs: unknown[]) {
 describe("copying-risk regeneration", () => {
   it("regenerates at most once and accepts a safer second draft", async () => {
     const adapter = adapterWith(riskyOutput, safeOutput);
-    const result = await generateWithCopyingGuard(adapter, brief, rag);
+    const result = await generateWithCopyingGuard(adapter, brief, rag, validTrendContext);
     expect(adapter.generate).toHaveBeenCalledTimes(2);
     expect(adapter.generate).toHaveBeenLastCalledWith(
       brief,
-      expect.objectContaining({ copyingRiskRetry: true }),
+      expect.objectContaining({
+        copyingRiskRetry: true,
+        trendContext: validTrendContext,
+      }),
     );
     expect(result.safetyReport.copyingRisk.status).toBe("passed");
     expect(result.safetyReport.copyingRisk.regenerated).toBe(true);

@@ -1,4 +1,5 @@
 import type { ContentTask, SafetyReport } from "@/lib/types";
+import { validateTrendContext, type TrendContext } from "./trend-context";
 import {
   ModelAdapterError,
   type GeneratedContent,
@@ -24,6 +25,31 @@ export function parseContentBrief(value: unknown): ContentTask {
     goal: input.goal as ContentTask["goal"],
     useIntelligence: input.useIntelligence,
   };
+}
+
+export function parseContentRequest(value: unknown): {
+  brief: ContentTask;
+  trendContext?: TrendContext;
+} {
+  if (
+    value
+    && typeof value === "object"
+    && !Array.isArray(value)
+    && "brief" in value
+  ) {
+    const input = value as Record<string, unknown>;
+    const allowed = new Set(["brief", "trendContext"]);
+    if (Object.keys(input).some((key) => !allowed.has(key))) {
+      throw new Error("请求包含不支持的字段。");
+    }
+    return {
+      brief: parseContentBrief(input.brief),
+      ...(input.trendContext === undefined
+        ? {}
+        : { trendContext: validateTrendContext(input.trendContext) }),
+    };
+  }
+  return { brief: parseContentBrief(value) };
 }
 
 function parseStringArray(value: unknown, label: string, max: number) {
