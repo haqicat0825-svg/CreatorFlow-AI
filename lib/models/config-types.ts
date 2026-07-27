@@ -1,6 +1,6 @@
 export type TextProvider = "openai" | "deepseek" | "mock" | "local-cli";
 export type TextMode = "cloud" | "mock" | "local-cli";
-export type ImageProvider = "openai" | "mock";
+export type ImageProvider = "openai" | "volcengine-jimeng" | "mock";
 export type ImageMode = "cloud" | "mock";
 export type ImageAspectRatio = "3:4" | "1:1" | "4:3";
 export type ImageQuality = "low" | "medium" | "high";

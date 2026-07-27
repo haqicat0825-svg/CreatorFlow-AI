@@ -4,6 +4,33 @@ import { RESEARCH_CONFIG } from "./types";
 
 const sensitiveKeys = /cookie|token|secret|password|authorization|credential|qrcode/i;
 
+export type CliExecutionResult = {
+  stdout: string;
+  stderr: string;
+  exitCode: number;
+};
+
+export function buildCliEnvironment(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): NodeJS.ProcessEnv {
+  return {
+    PATH: env.PATH,
+    SystemRoot: env.SystemRoot,
+    NODE_ENV: env.NODE_ENV,
+    USERPROFILE: env.USERPROFILE,
+    HOME: env.HOME,
+    APPDATA: env.APPDATA,
+    LOCALAPPDATA: env.LOCALAPPDATA,
+    HOMEDRIVE: env.HOMEDRIVE,
+    HOMEPATH: env.HOMEPATH,
+    HTTP_PROXY: env.HTTP_PROXY,
+    HTTPS_PROXY: env.HTTPS_PROXY,
+    ALL_PROXY: env.ALL_PROXY,
+    NO_PROXY: env.NO_PROXY,
+    PYTHONUTF8: "1",
+  } as NodeJS.ProcessEnv;
+}
+
 export async function executeReadOnlyCli(
   executable: string,
   args: readonly string[],
@@ -11,28 +38,18 @@ export async function executeReadOnlyCli(
 ) {
   const timeoutMs = options.timeoutMs ?? RESEARCH_CONFIG.timeoutMs;
   const maxOutputBytes = options.maxOutputBytes ?? RESEARCH_CONFIG.maxOutputBytes;
-  return new Promise<{ stdout: string; exitCode: number }>((resolve, reject) => {
+  return new Promise<CliExecutionResult>((resolve, reject) => {
     const child = spawn(executable, [...args], {
       shell: false,
       windowsHide: true,
       stdio: ["ignore", "pipe", "pipe"],
-      env: {
-        PATH: process.env.PATH,
-        SystemRoot: process.env.SystemRoot,
-        NODE_ENV: process.env.NODE_ENV,
-        USERPROFILE: process.env.USERPROFILE,
-        APPDATA: process.env.APPDATA,
-        LOCALAPPDATA: process.env.LOCALAPPDATA,
-        HOMEDRIVE: process.env.HOMEDRIVE,
-        HOMEPATH: process.env.HOMEPATH,
-        PYTHONUTF8: "1",
-      },
+      env: buildCliEnvironment(),
     });
     const stdoutChunks: Buffer[] = [];
     const stderrChunks: Buffer[] = [];
     let total = 0;
     let settled = false;
-    const finish = (error?: Error, value?: { stdout: string; exitCode: number }) => {
+    const finish = (error?: Error, value?: CliExecutionResult) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
@@ -59,7 +76,7 @@ export async function executeReadOnlyCli(
       const stdout = Buffer.concat(stdoutChunks).toString("utf8");
       const stderr = Buffer.concat(stderrChunks).toString("utf8");
       if (exitCode !== 0 && !options.allowNonZero) return finish(classifyCliFailure(`${stdout}\n${stderr}`));
-      finish(undefined, { stdout, exitCode: exitCode ?? -1 });
+      finish(undefined, { stdout, stderr, exitCode: exitCode ?? -1 });
     });
   });
 }

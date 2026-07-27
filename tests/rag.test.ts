@@ -3,6 +3,7 @@ import { buildRagContext } from "@/lib/knowledge/rag";
 import type { KnowledgeItem } from "@/lib/knowledge/types";
 
 const item: KnowledgeItem = {
+  category: "title_template",
   id: "knowledge-1",
   title: "高质量标题公式",
   content: "标题应包含明确场景和可执行收益。",

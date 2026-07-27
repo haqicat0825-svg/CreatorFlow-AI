@@ -1,13 +1,20 @@
+import { createHash } from "node:crypto";
 import type { LoginStatus, ResearchAdapter, SearchRequest, SearchResult } from "./types";
 import { ResearchError } from "./errors";
-import { executeReadOnlyCli, filterSensitiveFields, parseSafeJsonOutput } from "./cli-runtime";
+import {
+  classifyCliFailure,
+  executeReadOnlyCli,
+  filterSensitiveFields,
+  parseSafeJsonOutput,
+} from "./cli-runtime";
 
 export const XIAOHONGSHU_CLI_AUDIT = {
   available: true,
   auditedAt: "2026-07-24",
   version: "0.6.4",
   repository: "https://github.com/jackwener/xiaohongshu-cli",
-  executable: process.platform === "win32" ? "xhs.exe" : "xhs",
+  executable: "xhs",
+  compatibleExecutables: ["xhs", "xiaohongshu"],
   reason: "已审计 xhs 0.6.4 的 status/search 参数和 JSON schema；仅启用固定只读命令。",
   supportsStructuredReadOnlySearch: true,
 } as const;
@@ -19,8 +26,7 @@ export class XiaohongshuCliAdapter implements ResearchAdapter {
 
   async checkLoginStatus(): Promise<LoginStatus> {
     try {
-      const result = await this.execute(
-        XIAOHONGSHU_CLI_AUDIT.executable,
+      const result = await this.executeAuditedCommand(
         ["status", "--json"],
         { allowNonZero: true },
       );
@@ -62,8 +68,7 @@ export class XiaohongshuCliAdapter implements ResearchAdapter {
   }
 
   async searchContent(request: SearchRequest): Promise<SearchResult[]> {
-    const result = await this.execute(
-      XIAOHONGSHU_CLI_AUDIT.executable,
+    const result = await this.executeAuditedCommand(
       [
         "search",
         request.query,
@@ -77,10 +82,34 @@ export class XiaohongshuCliAdapter implements ResearchAdapter {
       ],
       { allowNonZero: true },
     );
+    if (result.exitCode !== 0) {
+      const envelope = tryParseEnvelope(result.stdout);
+      if (envelope && !envelope.ok) throw mapCliError(envelope.errorCode);
+      throw classifyCliFailure(`${result.stdout}\n${result.stderr}`);
+    }
     const envelope = parseEnvelope(result.stdout);
     if (!envelope.ok) throw mapCliError(envelope.errorCode);
     const items = Array.isArray(envelope.data?.items) ? envelope.data.items : [];
-    return items.slice(0, request.limit).map((item, index) => normalizeCliItem(item, index));
+    return items
+      .map(normalizeCliItem)
+      .filter((item): item is SearchResult => item !== undefined)
+      .slice(0, request.limit);
+  }
+
+  private async executeAuditedCommand(
+    args: readonly string[],
+    options: { allowNonZero?: boolean } = {},
+  ) {
+    let unavailable: ResearchError | undefined;
+    for (const executable of XIAOHONGSHU_CLI_AUDIT.compatibleExecutables) {
+      try {
+        return await this.execute(executable, args, options);
+      } catch (error) {
+        if (!(error instanceof ResearchError) || error.code !== "CLI_UNAVAILABLE") throw error;
+        unavailable = error;
+      }
+    }
+    throw unavailable ?? new ResearchError("CLI_UNAVAILABLE", "无法启动 xiaohongshu-cli。", 503);
   }
 }
 
@@ -110,8 +139,17 @@ function parseEnvelope(raw: string): CliEnvelope {
   };
 }
 
-function normalizeCliItem(raw: unknown, index: number): SearchResult {
+function tryParseEnvelope(raw: string) {
+  try {
+    return parseEnvelope(raw);
+  } catch {
+    return undefined;
+  }
+}
+
+function normalizeCliItem(raw: unknown): SearchResult | undefined {
   if (!raw || typeof raw !== "object") throw new ResearchError("INVALID_RESPONSE", "CLI 搜索条目无效。", 502);
+  const rawItem = raw as Record<string, unknown>;
   const item = filterSensitiveFields(raw) as Record<string, unknown>;
   const card = item.note_card && typeof item.note_card === "object"
     ? item.note_card as Record<string, unknown>
@@ -120,22 +158,99 @@ function normalizeCliItem(raw: unknown, index: number): SearchResult {
   const interact = card.interact_info && typeof card.interact_info === "object"
     ? card.interact_info as Record<string, unknown>
     : {};
-  const id = stringValue(item.id) || stringValue(card.note_id);
-  const title = stringValue(card.title) || stringValue(card.display_title);
-  if (!id || !title) throw new ResearchError("INVALID_RESPONSE", "CLI 搜索条目缺少 ID 或标题。", 502);
-  const liked = numericMetric(interact.liked_count);
+  const cover = card.cover && typeof card.cover === "object"
+    ? card.cover as Record<string, unknown>
+    : {};
+  const cliUrl = safeXiaohongshuUrl(
+    stringValue(item.url)
+      || stringValue(item.link)
+      || stringValue(item.source_url)
+      || stringValue(item.sourceUrl)
+      || stringValue(card.url)
+      || stringValue(card.link),
+  );
+  const id = stringValue(item.note_id)
+    || stringValue(card.note_id)
+    || noteIdFromSearchResultUrl(cliUrl)
+    || stableTokenId(rawItem.xsec_token)
+    || stringValue(item.id);
+  const title = stringValue(card.display_title) || stringValue(card.title);
+  if (!id || !title) return undefined;
+  const author = stringValue(user.nickname) || stringValue(card.author);
+  const summary = stringValue(card.summary)
+    || stringValue(card.content)
+    || stringValue(card.desc)
+    || stringValue(item.summary)
+    || stringValue(item.content)
+    || stringValue(item.desc)
+    || title;
+  const liked = numericMetric(
+    interact.liked_count
+      ?? card.liked
+      ?? card.likes
+      ?? card.liked_count,
+  );
+  const saved = numericMetric(
+    interact.collected_count,
+  );
+  const comments = numericMetric(
+    interact.comment_count,
+  );
+  const coverImage = safeHttpUrl(stringValue(cover.url_default));
+  const images = [
+    ...imageUrlsFromList(card.image_list),
+    ...imageUrlsFromList(item.image_list),
+  ];
+  const uniqueImages = [...new Set([coverImage, ...images].filter((image): image is string => Boolean(image)))];
   return {
     id,
     title: title.slice(0, 200),
-    summary: title.slice(0, 200),
-    author: stringValue(user.nickname)?.slice(0, 100),
-    sourceUrl: `https://www.xiaohongshu.com/explore/${encodeURIComponent(id)}`,
-    metrics: liked === undefined ? undefined : { likes: liked },
+    summary: summary.slice(0, 500),
+    author: author?.slice(0, 100),
+    coverImage,
+    images: uniqueImages.length ? uniqueImages : undefined,
+    likes: liked,
+    saves: saved,
+    comments,
+    url: cliUrl ?? `https://www.xiaohongshu.com/explore/${encodeURIComponent(id)}`,
+    sourceUrl: cliUrl ?? `https://www.xiaohongshu.com/explore/${encodeURIComponent(id)}`,
+    thumbnailUrl: coverImage,
+    metrics: liked === undefined && saved === undefined && comments === undefined
+      ? undefined
+      : {
+          ...(liked === undefined ? {} : { likes: liked }),
+          ...(saved === undefined ? {} : { saves: saved }),
+          ...(comments === undefined ? {} : { comments }),
+        },
     tags: [],
     source: "xiaohongshu",
     retrievedAt: new Date().toISOString(),
     isMock: false,
   };
+}
+
+function imageUrlsFromList(value: unknown) {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap(entry => {
+    if (typeof entry === "string") {
+      const url = safeHttpUrl(entry);
+      return url ? [url] : [];
+    }
+    if (!entry || typeof entry !== "object") return [];
+    const image = entry as Record<string, unknown>;
+    const direct = safeHttpUrl(
+      stringValue(image.url_default)
+        || stringValue(image.url)
+        || stringValue(image.src),
+    );
+    if (direct) return [direct];
+    if (!Array.isArray(image.info_list)) return [];
+    return image.info_list.flatMap(info => {
+      if (!info || typeof info !== "object") return [];
+      const url = safeHttpUrl(stringValue((info as Record<string, unknown>).url));
+      return url ? [url] : [];
+    });
+  });
 }
 
 function stringValue(value: unknown) {
@@ -144,8 +259,50 @@ function stringValue(value: unknown) {
 
 function numericMetric(value: unknown) {
   if (typeof value === "number" && Number.isFinite(value)) return value;
-  if (typeof value === "string" && /^\d+$/u.test(value.trim())) return Number(value);
+  if (typeof value === "string") {
+    const normalized = value.trim().replace(/,/gu, "");
+    if (/^\d+$/u.test(normalized)) return Number(normalized);
+  }
   return undefined;
+}
+
+function safeXiaohongshuUrl(value?: string) {
+  if (!value) return undefined;
+  try {
+    const url = new URL(value, "https://www.xiaohongshu.com");
+    if (url.hostname !== "xiaohongshu.com" && !url.hostname.endsWith(".xiaohongshu.com")) return undefined;
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return undefined;
+  }
+}
+
+function safeHttpUrl(value?: string) {
+  if (!value) return undefined;
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function noteIdFromSearchResultUrl(value?: string) {
+  if (!value) return undefined;
+  try {
+    return new URL(value).pathname.match(/\/search_result\/([A-Za-z0-9_-]+)/u)?.[1];
+  } catch {
+    return undefined;
+  }
+}
+
+function stableTokenId(value: unknown) {
+  const token = stringValue(value);
+  return token
+    ? `xsec-${createHash("sha256").update(token).digest("hex").slice(0, 20)}`
+    : undefined;
 }
 
 function mapCliError(code?: string) {

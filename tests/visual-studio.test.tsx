@@ -5,25 +5,20 @@ import VisualStudioPage from "@/app/visual-studio/page";
 
 const modelCheck = {
   success: true,
-  provider: "mock",
-  model: "CreatorFlow Image Demo",
-  mode: "mock",
+  provider: "volcengine-jimeng",
+  model: "doubao-seedream-5-0-pro-260628",
+  mode: "cloud",
   configured: true,
-  check: "MOCK_READY",
 };
-const imageResult = {
-  success: true,
-  data: {
-    images: [
-      { id: "image-1", url: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E", width: 1024, height: 1536, mimeType: "image/svg+xml" },
-      { id: "image-2", url: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E", width: 1024, height: 1536, mimeType: "image/svg+xml" },
-    ],
-    provider: "mock",
-    model: "CreatorFlow Image Demo",
-    isMock: true,
-    safetyWarnings: [],
-    generationId: "generation-1",
-  },
+const result = {
+  images: [
+    { id: "image-1", url: "https://example.com/one.png", width: 1024, height: 1536, mimeType: "image/png" },
+  ],
+  provider: "volcengine-jimeng",
+  model: "doubao-seedream-5-0-pro-260628",
+  isMock: false,
+  safetyWarnings: [],
+  generationId: "generation-1",
 };
 
 beforeEach(() => {
@@ -46,47 +41,78 @@ function memoryStorage(): Storage {
   };
 }
 
-describe("Visual Studio image flow", () => {
-  it("receives the Creator cover prompt and keeps edited prompt and candidates after failure", async () => {
-    window.sessionStorage.setItem("creatorflow-visual-task", JSON.stringify({
-      taskId: "task-1",
-      coverPrompt: "来自 Creator 的封面 Prompt",
-      style: ["自然"],
-      audience: ["新手"],
-      contentGoal: "种草",
-    }));
-    const fetchMock = vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify(modelCheck), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify(imageResult), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ success: false, error: { code: "TIMEOUT" } }), { status: 504 }));
+describe("Visual Studio asynchronous image flow", () => {
+  it("creates a task and renders only server-reported progress steps", async () => {
+    let statusChecks = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === "/api/models/test") return json(modelCheck);
+      if (url === "/api/generate/image/status" && !init?.method) return json({}, 404);
+      if (url === "/api/generate/image") return json({ taskId: "task-1", status: "processing" }, 202);
+      if (url.includes("/api/generate/image/status?id=task-1")) {
+        statusChecks += 1;
+        return statusChecks === 1
+          ? json({ success: true, data: task("processing", "calling_model") })
+          : json({ success: true, data: { ...task("completed", "completed"), result, libraryItemIds: ["library-1"] } });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
     vi.stubGlobal("fetch", fetchMock);
     const user = userEvent.setup();
     render(<VisualStudioPage />);
 
-    const prompt = await screen.findByLabelText("封面 Prompt");
-    expect(prompt).toHaveValue("来自 Creator 的封面 Prompt");
-    await user.clear(prompt);
-    await user.type(prompt, "用户编辑后的 Prompt");
-    await user.click(screen.getByRole("button", { name: "生成 4 张" }));
-    expect(await screen.findAllByAltText("AI 生成的封面候选")).toHaveLength(2);
+    await user.selectOptions(await screen.findByLabelText("候选"), "1");
+    await user.click(screen.getByRole("button", { name: "生成 1 张" }));
 
-    await user.click(screen.getByRole("button", { name: "生成 4 张" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("Prompt 和已有候选已保留");
-    expect(prompt).toHaveValue("用户编辑后的 Prompt");
-    expect(screen.getAllByAltText("AI 生成的封面候选")).toHaveLength(2);
+    expect(screen.getByText("AI 正在生成封面")).toBeInTheDocument();
+    expect(screen.getByText("预计需要 30–90 秒，请耐心等待")).toBeInTheDocument();
+    ["分析穿搭主题", "构建视觉 Prompt", "调用 Seedream 模型", "生成封面图片", "保存到图片库"]
+      .forEach(label => expect(screen.getByText(label)).toBeInTheDocument());
+    expect(screen.getByText("调用 Seedream 模型").parentElement).toHaveTextContent("•");
+
+    expect(await screen.findByAltText("AI 生成的封面候选", {}, { timeout: 3_000 })).toBeInTheDocument();
+    expect(screen.getByText("生成结果已自动保存到 AI 图片库。")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "设为封面" }));
+    expect(JSON.parse(window.localStorage.getItem("creatorflow-selected-cover") ?? "{}")).toMatchObject({
+      imageUrl: "https://example.com/one.png",
+      source: "generated",
+      imageId: "image-1",
+    });
+    expect(fetchMock).toHaveBeenCalledWith("/api/generate/image", expect.objectContaining({ method: "POST" }));
   });
 
-  it("selects a successful candidate as cover", async () => {
-    vi.stubGlobal("fetch", vi.fn()
-      .mockResolvedValueOnce(new Response(JSON.stringify(modelCheck), { status: 200 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify(imageResult), { status: 200 })));
-    const user = userEvent.setup();
+  it("restores a processing task after re-entering Visual Studio", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/models/test") return json(modelCheck);
+      if (url === "/api/generate/image/status") {
+        return json({ success: true, data: task("processing", "saving_library") });
+      }
+      if (url.includes("/api/generate/image/status?id=task-1")) {
+        return json({ success: true, data: task("processing", "saving_library") });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
     render(<VisualStudioPage />);
-    await user.click(screen.getByRole("button", { name: "生成 4 张" }));
-    const second = await screen.findByRole("button", { name: "候选封面 image-2" });
-    await user.click(second);
-    expect(second).toHaveAttribute("aria-pressed", "true");
-    await user.click(screen.getByRole("button", { name: "设为封面" }));
-    await waitFor(() => expect(screen.getByText("已设为封面")).toBeInTheDocument());
+
+    expect(await screen.findByText("AI 正在生成封面")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("保存到图片库").parentElement).toHaveTextContent("•"));
   });
 });
+
+function task(status: "processing" | "completed", step: string) {
+  return {
+    id: "task-1",
+    status,
+    step,
+    prompt: "韩系穿搭封面",
+    request: { prompt: "韩系穿搭封面", aspectRatio: "3:4", quality: "medium", candidateCount: 1 },
+    createdAt: "2026-07-27T00:00:00.000Z",
+    updatedAt: "2026-07-27T00:00:01.000Z",
+  };
+}
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+}

@@ -25,10 +25,24 @@ const legacyBrief = {
 };
 
 beforeEach(() => {
+  if (!window.localStorage) Object.defineProperty(window, "localStorage", { configurable: true, value: memoryStorage() });
+  window.localStorage.clear();
   window.sessionStorage.clear();
   window.sessionStorage.setItem("creatorflow-task", JSON.stringify(legacyBrief));
   vi.restoreAllMocks();
 });
+
+function memoryStorage(): Storage {
+  const values = new Map<string, string>();
+  return {
+    get length() { return values.size; },
+    clear: () => values.clear(),
+    getItem: key => values.get(key) ?? null,
+    key: index => Array.from(values.keys())[index] ?? null,
+    removeItem: key => { values.delete(key); },
+    setItem: (key, value) => { values.set(key, value); },
+  };
+}
 
 describe("Creator API states", () => {
   it("renders a successful API result", async () => {
@@ -65,5 +79,24 @@ describe("Creator API states", () => {
     expect(stored.taskId).toBeTruthy();
     expect(stored).not.toHaveProperty("apiKey");
     expect(stored).not.toHaveProperty("rag");
+  });
+
+  it("shows a cover selected from either Visual Studio or the AI image library", async () => {
+    window.localStorage.setItem("creatorflow-selected-cover", JSON.stringify({
+      schemaVersion: "1",
+      imageUrl: "https://example.com/selected-cover.png",
+      imageId: "ai-image-1",
+      source: "library",
+      selectedAt: "2026-07-27T00:00:00.000Z",
+    }));
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify(successPayload), { status: 200 })));
+    render(<CreatorPage />);
+
+    expect(await screen.findByRole("img", { name: "当前选择的内容封面" })).toHaveAttribute(
+      "src",
+      "https://example.com/selected-cover.png",
+    );
+    expect(screen.getByText("来自 AI 图片库")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "从 AI 图片库选择" })).toHaveAttribute("href", "/library?category=ai_image");
   });
 });

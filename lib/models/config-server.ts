@@ -78,6 +78,8 @@ export function getServerImageModelConfig(env: NodeJS.ProcessEnv = process.env):
   const requested = (env.CREATORFLOW_IMAGE_PROVIDER ?? "").toLowerCase();
   const provider: ImageProvider = requested === "openai"
     ? "openai"
+    : requested === "volcengine-jimeng"
+      ? "volcengine-jimeng"
     : requested === "mock"
       ? "mock"
       : env.OPENAI_API_KEY
@@ -101,6 +103,21 @@ export function getServerImageModelConfig(env: NodeJS.ProcessEnv = process.env):
       quality,
       candidateCount,
       configured: true,
+    };
+  }
+
+  if (provider === "volcengine-jimeng") {
+    const apiKey = env.ARK_API_KEY;
+    return {
+      provider,
+      model: "doubao-seedream-5-0-pro-260628",
+      mode: "cloud",
+      size: IMAGE_SIZES[aspectRatio],
+      aspectRatio,
+      quality,
+      candidateCount,
+      configured: Boolean(apiKey),
+      apiKey,
     };
   }
 

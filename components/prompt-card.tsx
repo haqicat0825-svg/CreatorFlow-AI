@@ -5,7 +5,7 @@ export type PromptSettings = {
   ratio: "3:4" | "1:1" | "4:3";
   quality: "low" | "medium" | "high";
   candidateCount: number;
-  provider: "openai" | "mock";
+  provider: "openai" | "volcengine-jimeng" | "mock";
   model: string;
 };
 
@@ -32,7 +32,8 @@ export function PromptCard({
     <h2 className="mt-2 text-xl font-bold">封面 Prompt</h2>
     <label className="mt-6 block text-xs font-bold text-[var(--muted)]">图片模型
       <select aria-label="图片模型" value={settings.provider} onChange={event => set("provider", event.target.value as PromptSettings["provider"])} className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-[var(--cream)] px-4 py-3 text-sm text-[var(--ink)]">
-        <option value="openai">OpenAI · {settings.model}</option>
+        <option value="openai">OpenAI · gpt-image-1</option>
+        <option value="volcengine-jimeng">Volcengine Jimeng · doubao-seedream-5-0-pro-260628</option>
         <option value="mock">Demo / Mock</option>
       </select>
     </label>

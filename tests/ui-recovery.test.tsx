@@ -5,6 +5,10 @@ import LibraryPage from "@/app/library/page";
 import ModelsPage from "@/app/models/page";
 import VisualStudioPage from "@/app/visual-studio/page";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
 const creatorResult = {
   success: true,
   data: {
@@ -67,7 +71,7 @@ describe("controlled UI recovery", () => {
   it("keeps every Library category accessible with pressed state", () => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true, data: { enabled: false } }), { status: 200 })));
     render(<LibraryPage />);
-    ["全部", "爆款案例", "我的风格", "标题公式", "视觉素材"].forEach(label => {
+    ["全部", "小红书爆款案例库", "个人审美风格库", "爆款标题模板库", "AI图片库"].forEach(label => {
       expect(screen.getByRole("button", { name: label })).toHaveAttribute("aria-pressed");
     });
   });

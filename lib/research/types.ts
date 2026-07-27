@@ -21,6 +21,12 @@ export type SearchResult = {
   title: string;
   summary: string;
   author?: string;
+  coverImage?: string;
+  images?: string[];
+  likes?: number;
+  saves?: number;
+  comments?: number;
+  url?: string;
   publishedAt?: string;
   sourceUrl: string;
   thumbnailUrl?: string;

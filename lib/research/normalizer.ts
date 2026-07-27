@@ -55,6 +55,13 @@ export function validateSearchResult(input: unknown): SearchResult {
   const metrics = value.metrics && typeof value.metrics === "object"
     ? Object.fromEntries(Object.entries(value.metrics).filter((entry): entry is [string, number] => typeof entry[1] === "number" && Number.isFinite(entry[1])))
     : undefined;
+  const coverImage = optionalHttpUrl(value.coverImage);
+  const images = Array.isArray(value.images)
+    ? [...new Set(value.images.map(optionalHttpUrl).filter((image): image is string => Boolean(image)))].slice(0, 20)
+    : undefined;
+  const likes = optionalMetric(value.likes);
+  const saves = optionalMetric(value.saves);
+  const comments = optionalMetric(value.comments);
   if (!["xiaohongshu", "tavily"].includes(String(value.source))) {
     throw new ResearchError("INVALID_RESPONSE", "搜索结果来源无效。", 502);
   }
@@ -63,13 +70,33 @@ export function validateSearchResult(input: unknown): SearchResult {
     title: String(value.title).trim().slice(0, 200),
     summary: String(value.summary).trim().slice(0, 10_000),
     author: typeof value.author === "string" ? value.author.trim().slice(0, 100) || undefined : undefined,
+    coverImage,
+    images: images?.length ? images : undefined,
+    likes,
+    saves,
+    comments,
+    url: sourceUrl,
     publishedAt: typeof value.publishedAt === "string" ? value.publishedAt : undefined,
     sourceUrl,
-    thumbnailUrl: typeof value.thumbnailUrl === "string" ? value.thumbnailUrl : undefined,
+    thumbnailUrl: coverImage ?? optionalHttpUrl(value.thumbnailUrl),
     metrics: metrics && Object.keys(metrics).length ? metrics : undefined,
     tags: Array.isArray(value.tags) ? value.tags.filter((tag): tag is string => typeof tag === "string").slice(0, 20) : [],
     source: value.source as SearchResult["source"],
     retrievedAt: String(value.retrievedAt),
     isMock: value.isMock === true,
   };
+}
+
+function optionalHttpUrl(value: unknown) {
+  if (typeof value !== "string") return undefined;
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol) ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function optionalMetric(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0 ? value : undefined;
 }

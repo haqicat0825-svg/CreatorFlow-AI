@@ -60,7 +60,7 @@ function response(data: unknown) {
 function installFetch() {
   const fetchMock = vi.fn((input: RequestInfo | URL) => {
     const url = String(input);
-    if (url.endsWith("/api/research/status")) {
+    if (url.startsWith("/api/research/status")) {
       return response({ available: true, loggedIn: true, provider: "tavily", safeMessage: "Tavily 可用。" });
     }
     if (url.endsWith("/api/research/search")) return response(results);

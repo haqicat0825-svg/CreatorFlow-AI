@@ -16,8 +16,8 @@ export function knowledgeFingerprint(value: Pick<KnowledgeItem, "title" | "conte
 
 export function findDuplicate(
   items: KnowledgeItem[],
-  candidate: Pick<KnowledgeItem, "title" | "content">,
+  candidate: Pick<KnowledgeItem, "title" | "content" | "category">,
 ) {
   const fingerprint = knowledgeFingerprint(candidate);
-  return items.find(item => !item.deletedAt && knowledgeFingerprint(item) === fingerprint);
+  return items.find(item => !item.deletedAt && item.category === candidate.category && knowledgeFingerprint(item) === fingerprint);
 }

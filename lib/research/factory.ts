@@ -4,6 +4,8 @@ import { XIAOHONGSHU_CLI_AUDIT, XiaohongshuCliAdapter } from "./xiaohongshu-cli"
 import { ResearchError } from "./errors";
 import { TavilySearchAdapter } from "./tavily";
 
+export type SelectableResearchProvider = "xiaohongshu-cli" | "tavily";
+
 export function createResearchAdapter(
   provider = process.env.CREATORFLOW_RESEARCH_PROVIDER?.trim().toLowerCase() || "mock",
 ): ResearchAdapter {
@@ -25,4 +27,9 @@ export function createResearchAdapter(
       }
     },
   };
+}
+
+export function parseSelectableResearchProvider(value: unknown): SelectableResearchProvider {
+  if (value === "xiaohongshu-cli" || value === "tavily") return value;
+  throw new ResearchError("INVALID_REQUEST", "Research Source 无效。", 400);
 }

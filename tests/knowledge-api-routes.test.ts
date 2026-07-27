@@ -3,7 +3,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { FileKnowledgeRepository } from "@/lib/knowledge/repository";
-import { GET as listKnowledge, POST as createKnowledge } from "@/app/api/knowledge/route";
+import { DELETE as deleteKnowledge, GET as listKnowledge, POST as createKnowledge } from "@/app/api/knowledge/route";
 import { GET as listItems } from "@/app/api/knowledge/items/route";
 import { POST as searchKnowledge } from "@/app/api/knowledge/search/route";
 
@@ -28,6 +28,37 @@ afterEach(async () => {
 });
 
 describe("Knowledge API routes", () => {
+  it("bulk deletes only the requested knowledge records", async () => {
+    const first = await repository.create({
+      title: "待删除知识",
+      content: "只删除知识库副本",
+      sourceType: "manual",
+      tags: ["测试"],
+      contentType: "reference",
+      qualityStatus: "approved",
+      authenticityStatus: "verified",
+    });
+    const kept = await repository.create({
+      title: "保留知识",
+      content: "另一条独立记录",
+      sourceType: "manual",
+      tags: ["测试"],
+      contentType: "reference",
+      qualityStatus: "approved",
+      authenticityStatus: "verified",
+    });
+
+    const response = await deleteKnowledge(new Request("http://localhost/api/knowledge", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids: [first.id] }),
+    }));
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ success: true, data: { deletedIds: [first.id] } });
+    expect((await repository.list()).map(item => item.id)).toEqual([kept.id]);
+  });
+
   it("round-trips UTF-8 JSON and returns a controlled duplicate response", async () => {
     const input = {
       title: "韩系秋季针织穿搭参考🎀",

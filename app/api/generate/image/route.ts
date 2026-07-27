@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { modelErrorResponse } from "@/lib/api/model-errors";
 import { getServerImageModelConfig } from "@/lib/models/config-server";
 import type { ImageAspectRatio, ImageQuality, ServerImageModelConfig } from "@/lib/models/config-types";
-import { createImageAdapter } from "@/lib/providers/image-factory";
 import type { ImageGenerationRequest } from "@/lib/providers/image-types";
 import { ModelAdapterError } from "@/lib/providers/types";
+import { getImageTaskRepository } from "@/lib/image-tasks/repository";
+import { startImageTask } from "@/lib/image-tasks/processor";
 
 export const runtime = "nodejs";
 
@@ -31,21 +31,34 @@ export async function POST(request: Request) {
 
   try {
     const serverConfig = resolveConfig(parsed.provider, parsed.model, getServerImageModelConfig());
-    const result = await createImageAdapter({
-      ...serverConfig,
-      aspectRatio: parsed.aspectRatio,
-      size: sizeFor(parsed.aspectRatio),
-      quality: parsed.quality,
-      candidateCount: parsed.candidateCount,
-    }).generateImage(parsed);
-    return NextResponse.json({
-      success: true,
-      data: result,
-      temporary: true,
-      expiresNote: "图片为临时资源，可能过期；当前阶段不会永久保存。",
+    const task = await getImageTaskRepository().create({
+      request: {
+        prompt: parsed.prompt,
+        negativePrompt: parsed.negativePrompt,
+        aspectRatio: parsed.aspectRatio,
+        quality: parsed.quality,
+        candidateCount: parsed.candidateCount,
+        referenceContext: parsed.referenceContext,
+      },
+      provider: parsed.provider,
+      model: parsed.model,
     });
+    startImageTask(task.id, serverConfig);
+    return NextResponse.json(
+      { taskId: task.id, status: task.status },
+      { status: 202, headers: { "Cache-Control": "no-store" } },
+    );
   } catch (error) {
-    return modelErrorResponse(error);
+    if (error instanceof ModelAdapterError) {
+      return NextResponse.json(
+        { success: false, error: { code: error.code, message: error.message } },
+        { status: error.status },
+      );
+    }
+    return NextResponse.json(
+      { success: false, error: { code: "STORAGE_ERROR", message: "无法创建图片生成任务。" } },
+      { status: 500 },
+    );
   }
 }
 
@@ -66,7 +79,7 @@ function parseRequest(value: unknown): ImageGenerationRequest & { provider?: str
     throw new Error(`候选图片数量必须在 1 到 ${MAX_CANDIDATES} 之间。`);
   }
   const provider = typeof input.provider === "string" ? input.provider : undefined;
-  if (provider && !["openai", "mock"].includes(provider)) throw new Error("不支持的图片 Provider。");
+  if (provider && !["openai", "volcengine-jimeng", "mock"].includes(provider)) throw new Error("不支持的图片 Provider。");
   const model = typeof input.model === "string" ? input.model : undefined;
   return {
     prompt,
@@ -128,10 +141,4 @@ function checkRateLimit(request: Request) {
     { success: false, error: { code: "RATE_LIMITED", message: "图片生成请求过于频繁，请稍后重试。" } },
     { status: 429, headers: { "Retry-After": String(Math.ceil((current.resetAt - now) / 1000)) } },
   );
-}
-
-function sizeFor(ratio: ImageAspectRatio): ServerImageModelConfig["size"] {
-  if (ratio === "1:1") return "1024x1024";
-  if (ratio === "4:3") return "1536x1024";
-  return "1024x1536";
 }

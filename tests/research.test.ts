@@ -4,7 +4,13 @@ import os from "node:os";
 import path from "node:path";
 import { FileKnowledgeRepository } from "@/lib/knowledge/repository";
 import { buildRagContext } from "@/lib/knowledge/rag";
-import { classifyCliFailure, executeReadOnlyCli, filterSensitiveFields, parseSafeJsonOutput } from "@/lib/research/cli-runtime";
+import {
+  buildCliEnvironment,
+  classifyCliFailure,
+  executeReadOnlyCli,
+  filterSensitiveFields,
+  parseSafeJsonOutput,
+} from "@/lib/research/cli-runtime";
 import { ResearchError } from "@/lib/research/errors";
 import { importSelectedResearch } from "@/lib/research/importer";
 import { mockResearchAdapter } from "@/lib/research/mock-search";
@@ -27,6 +33,15 @@ const realResult = {
   title: "真实研究条目",
   summary: "仅保存 CLI 合法返回的摘要。",
   author: "作者",
+  coverImage: "https://sns-img.example.com/cover.jpg",
+  images: [
+    "https://sns-img.example.com/cover.jpg",
+    "https://sns-img.example.com/detail.jpg",
+  ],
+  likes: 128,
+  saves: 36,
+  comments: 9,
+  url: "https://www.xiaohongshu.com/explore/note-1",
   sourceUrl: "https://www.xiaohongshu.com/explore/note-1",
   tags: ["穿搭"],
   source: "xiaohongshu" as const,
@@ -47,11 +62,40 @@ describe("research safety", () => {
     expect(XIAOHONGSHU_CLI_AUDIT.available).toBe(true);
     const execute = async () => ({
       stdout: JSON.stringify({ ok: false, schema_version: "1", error: { code: "not_authenticated", message: "need login" } }),
+      stderr: "",
       exitCode: 1,
     });
     const status = await new XiaohongshuCliAdapter(execute).checkLoginStatus();
     expect(status).toEqual(expect.objectContaining({ available: true, loggedIn: false, provider: "xiaohongshu-cli" }));
     expect(JSON.stringify(status)).not.toMatch(/cookie|token|password|qrcode/i);
+  });
+
+  it("prefers xhs and falls back to the xiaohongshu executable for status checks", async () => {
+    const commands: string[] = [];
+    const execute = async (command: string) => {
+      commands.push(command);
+      if (command === "xhs") {
+        throw new ResearchError("CLI_UNAVAILABLE", "not installed", 503);
+      }
+      return {
+        stdout: JSON.stringify({
+          ok: true,
+          schema_version: "1",
+          data: { authenticated: true },
+        }),
+        stderr: "",
+        exitCode: 0,
+      };
+    };
+
+    const status = await new XiaohongshuCliAdapter(execute).checkLoginStatus();
+
+    expect(commands).toEqual(["xhs", "xiaohongshu"]);
+    expect(status).toEqual(expect.objectContaining({
+      available: true,
+      loggedIn: true,
+      provider: "xiaohongshu-cli",
+    }));
   });
 
   it("validates limits and rejects command-injection characters", () => {
@@ -81,11 +125,17 @@ describe("research safety", () => {
               note_card: {
                 display_title: "真实标题",
                 user: { nickname: "作者" },
-                interact_info: { liked_count: "12", collected_count: "not-requested" },
+                cover: { url_default: "https://sns-img.example.com/cover.jpg" },
+                image_list: [
+                  { url_default: "https://sns-img.example.com/detail.jpg" },
+                  { info_list: [{ url: "https://sns-img.example.com/detail-2.jpg" }] },
+                ],
+                interact_info: { liked_count: "12", collected_count: "8", comment_count: "3" },
               },
             }],
           },
         }),
+        stderr: "",
         exitCode: 0,
       };
     };
@@ -100,7 +150,50 @@ describe("research safety", () => {
       id: "note-123",
       title: "真实标题",
       author: "作者",
-      metrics: { likes: 12 },
+      coverImage: "https://sns-img.example.com/cover.jpg",
+      images: [
+        "https://sns-img.example.com/cover.jpg",
+        "https://sns-img.example.com/detail.jpg",
+        "https://sns-img.example.com/detail-2.jpg",
+      ],
+      likes: 12,
+      saves: 8,
+      comments: 3,
+      metrics: { likes: 12, saves: 8, comments: 3 },
+      isMock: false,
+    }));
+    expect(JSON.stringify(results)).not.toContain("sensitive-token");
+  });
+
+  it("maps flat xhs search fields and extracts the note id from a search_result link", async () => {
+    const execute = async () => ({
+      stdout: JSON.stringify({
+        ok: true,
+        schema_version: "1",
+        data: {
+          items: [{
+            title: "韩系通勤穿搭",
+            author: "穿搭作者",
+            liked: "1,234",
+            link: "https://www.xiaohongshu.com/search_result/67f123abc456?xsec_token=sensitive-token&xsec_source=pc_search",
+          }],
+        },
+      }),
+      stderr: "",
+      exitCode: 0,
+    });
+
+    const results = await new XiaohongshuCliAdapter(execute).searchContent({
+      query: "韩系",
+      limit: 10,
+    });
+
+    expect(results[0]).toEqual(expect.objectContaining({
+      id: "67f123abc456",
+      title: "韩系通勤穿搭",
+      author: "穿搭作者",
+      sourceUrl: "https://www.xiaohongshu.com/search_result/67f123abc456",
+      metrics: { likes: 1234 },
       isMock: false,
     }));
     expect(JSON.stringify(results)).not.toContain("sensitive-token");
@@ -110,6 +203,44 @@ describe("research safety", () => {
     expect(() => parseSafeJsonOutput("not-json")).toThrow(/有效 JSON/);
     expect(classifyCliFailure("captcha token=secret")).toMatchObject({ code: "PLATFORM_BLOCKED" });
     expect(classifyCliFailure("login required cookie=secret")).toMatchObject({ code: "LOGIN_REQUIRED" });
+  });
+
+  it("preserves required network variables without forwarding unrelated environment values", () => {
+    const env = buildCliEnvironment({
+      PATH: "bin",
+      USERPROFILE: "profile",
+      HOME: "home",
+      HTTP_PROXY: "http-proxy",
+      HTTPS_PROXY: "https-proxy",
+      ALL_PROXY: "all-proxy",
+      NO_PROXY: "no-proxy",
+      UNRELATED_SECRET: "must-not-pass",
+    });
+
+    expect(env).toEqual(expect.objectContaining({
+      PATH: "bin",
+      USERPROFILE: "profile",
+      HOME: "home",
+      HTTP_PROXY: "http-proxy",
+      HTTPS_PROXY: "https-proxy",
+      ALL_PROXY: "all-proxy",
+      NO_PROXY: "no-proxy",
+      PYTHONUTF8: "1",
+    }));
+    expect(env).not.toHaveProperty("UNRELATED_SECRET");
+  });
+
+  it("classifies stderr when xhs exits non-zero without JSON stdout", async () => {
+    const execute = async () => ({
+      stdout: "",
+      stderr: "network connection failed",
+      exitCode: 1,
+    });
+
+    await expect(new XiaohongshuCliAdapter(execute).searchContent({
+      query: "韩系",
+      limit: 10,
+    })).rejects.toMatchObject({ code: "NETWORK_ERROR" });
   });
 
   it("enforces CLI timeout and maximum output length", async () => {
@@ -142,9 +273,9 @@ describe("research safety", () => {
   });
 
   it("requires selection, imports selected real results, and skips duplicates", async () => {
-    await expect(importSelectedResearch({ query: "穿搭", selected: [] }, repository)).rejects.toThrow(/明确选择/);
-    const first = await importSelectedResearch({ query: "穿搭", selected: [realResult] }, repository);
-    const second = await importSelectedResearch({ query: "穿搭", selected: [realResult] }, repository);
+    await expect(importSelectedResearch({ query: "穿搭", selected: [], destination: "hot-content" }, repository)).rejects.toThrow(/明确选择/);
+    const first = await importSelectedResearch({ query: "穿搭", selected: [realResult], destination: "hot-content" }, repository);
+    const second = await importSelectedResearch({ query: "穿搭", selected: [realResult], destination: "hot-content" }, repository);
     expect(first.results[0].status).toBe("imported");
     expect(first.importedIds).toHaveLength(1);
     expect(first.duplicateIds).toEqual([]);
@@ -156,26 +287,66 @@ describe("research safety", () => {
     expect(second.storageConfirmed).toBe(true);
     expect((await repository.list())[0]).toEqual(expect.objectContaining({
       sourceUrl: realResult.sourceUrl,
+      category: "xiaohongshu_case",
+      sourceType: "xiaohongshu",
+      author: realResult.author,
+      coverImage: realResult.coverImage,
+      images: realResult.images,
+      likes: 128,
+      saves: 36,
+      comments: 9,
+      summary: realResult.summary,
       qualityStatus: "approved",
-      research: expect.objectContaining({ platform: "xiaohongshu", isMock: false }),
+      research: expect.objectContaining({
+        platform: "xiaohongshu",
+        sourceId: realResult.id,
+        isMock: false,
+        coverImage: realResult.coverImage,
+        images: realResult.images,
+        likes: 128,
+        saves: 36,
+        comments: 9,
+      }),
     }));
   });
 
   it("preserves the Tavily source when importing a selected result", async () => {
-    const result = await importSelectedResearch({ query: "trend research", selected: [tavilyResult] }, repository);
+    const result = await importSelectedResearch({ query: "trend research", selected: [tavilyResult], destination: "content-knowledge" }, repository);
 
     expect(result.results[0].status).toBe("imported");
     expect((await repository.list())[0]).toEqual(expect.objectContaining({
       sourceUrl: tavilyResult.sourceUrl,
+      category: "content_knowledge",
       qualityStatus: "approved",
       authenticityStatus: "verified",
       research: expect.objectContaining({ platform: "tavily", isMock: false }),
     }));
   });
 
+  it("keeps Tavily results out of the Xiaohongshu-only hot content library", async () => {
+    await expect(importSelectedResearch({
+      query: "trend research",
+      selected: [tavilyResult],
+      destination: "hot-content",
+    }, repository)).rejects.toThrow(/仅保存小红书/);
+    expect(await repository.list()).toEqual([]);
+  });
+
+  it("keeps hot content separate from the default RAG knowledge context", async () => {
+    await importSelectedResearch({
+      query: "穿搭",
+      selected: [realResult],
+      destination: "hot-content",
+    }, repository);
+    const rag = await buildRagContext({
+      topic: "真实研究条目", audiences: ["作者"], styles: ["穿搭"], goal: "种草", useIntelligence: true,
+    }, repository);
+    expect(rag.sources).toEqual([]);
+  });
+
   it("stores mock imports as drafts so they do not enter RAG by default", async () => {
     const [mock] = await mockResearchAdapter.searchContent({ query: "穿搭", limit: 1 });
-    await importSelectedResearch({ query: "穿搭", selected: [mock] }, repository);
+    await importSelectedResearch({ query: "穿搭", selected: [mock], destination: "content-knowledge" }, repository);
     const rag = await buildRagContext({
       topic: "穿搭", audiences: ["女生"], styles: ["韩系"], goal: "种草", useIntelligence: true,
     }, repository);
@@ -183,7 +354,7 @@ describe("research safety", () => {
   });
 
   it("lets RAG retrieve a manually imported real entry with its citation", async () => {
-    await importSelectedResearch({ query: "穿搭", selected: [realResult] }, repository);
+    await importSelectedResearch({ query: "穿搭", selected: [realResult], destination: "content-knowledge" }, repository);
     const rag = await buildRagContext({
       topic: "真实研究条目", audiences: ["作者"], styles: ["穿搭"], goal: "种草", useIntelligence: true,
     }, repository);

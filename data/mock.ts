@@ -13,16 +13,16 @@ const palette: [string,string,string][] = [
   ["#c4a79d","#ecddce","#6f5551"], ["#c8c6b8","#f1e7d8","#887e6f"], ["#e0bcb2","#f5e7dc","#a2766c"],
 ];
 export const libraryItems: LibraryItem[] = [
-  ["秋日奶油系叠穿公式","爆款案例",["Korean Style","Low Saturation"],96,"tall"],
-  ["首尔咖啡馆的松弛感","我的风格",["Cafe Scene","Soft Girl"],92,"portrait"],
-  ["显贵的同色系穿法","标题公式",["Korean Style","Clean"],89,"square"],
-  ["低饱和通勤灵感","视觉素材",["Low Saturation","Office"],94,"tall"],
-  ["针织衫的三种温柔搭配","爆款案例",["Soft Girl","Autumn"],91,"portrait"],
-  ["周末约会氛围板","我的风格",["Cafe Scene","Warm"],87,"square"],
-  ["100元复刻首尔街拍","标题公式",["Budget","Korean Style"],93,"portrait"],
-  ["奶杏色视觉素材包","视觉素材",["Beige","Low Saturation"],90,"tall"],
-  ["小个子秋季层次感","爆款案例",["Petite","Autumn"],95,"square"],
-].map((v,i) => ({ id:`item-${i}`, title:v[0] as string, category:v[1] as LibraryItem["category"], tags:v[2] as string[], score:v[3] as number, saved:i===1, aspect:v[4] as LibraryItem["aspect"], colors:palette[i] }));
+  ["秋日奶油系叠穿公式","小红书爆款案例库",["Korean Style","Low Saturation"],96,"tall","图片 · 标题 · 作者 · 点赞/收藏 · 标签 · 来源"],
+  ["首尔咖啡馆的松弛感","个人审美风格库",["Cafe Scene","Soft Girl"],92,"portrait","收藏图片 · 风格标签 · 颜色 · 氛围 · AI 总结"],
+  ["显贵的同色系穿法","爆款标题模板库",["Korean Style","Clean"],89,"square","AI 案例分析：结果词 + 具体方法"],
+  ["低饱和通勤灵感","AI图片库",["Low Saturation","Office"],94,"tall","Seedream · Prompt · 2026-07-27"],
+  ["针织衫的三种温柔搭配","小红书爆款案例库",["Soft Girl","Autumn"],91,"portrait","图片 · 标题 · 作者 · 点赞/收藏 · 标签 · 来源"],
+  ["周末约会氛围板","个人审美风格库",["Cafe Scene","Warm"],87,"square","收藏图片 · 暖色 · 松弛氛围 · AI 总结"],
+  ["100元复刻首尔街拍","爆款标题模板库",["Budget","Korean Style"],93,"portrait","AI 案例分析：数字锚点 + 复刻对象"],
+  ["奶杏色视觉素材包","AI图片库",["Beige","Low Saturation"],90,"tall","OpenAI · Prompt · 2026-07-27"],
+  ["小个子秋季层次感","小红书爆款案例库",["Petite","Autumn"],95,"square","图片 · 标题 · 作者 · 点赞/收藏 · 标签 · 来源"],
+].map((v,i) => ({ id:`item-${i}`, title:v[0] as string, category:v[1] as LibraryItem["category"], tags:v[2] as string[], score:v[3] as number, saved:i===1, aspect:v[4] as LibraryItem["aspect"], description:v[5] as string, colors:palette[i] }));
 
 export const workflowSteps: WorkflowStep[] = [
   { id:"research", name:"Research Agent", subtitle:"趋势与竞品研究", model:"DeepSeek-V4", status:"completed", output:"发现 24 个上升趋势", duration:"42s" },

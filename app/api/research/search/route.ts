@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createResearchAdapter } from "@/lib/research/factory";
+import { createResearchAdapter, parseSelectableResearchProvider } from "@/lib/research/factory";
 import { ResearchError, safeResearchMessage } from "@/lib/research/errors";
 import { validateSearchRequest, validateSearchResult } from "@/lib/research/normalizer";
 import { researchRateLimiter } from "@/lib/research/rate-limiter";
@@ -10,8 +10,9 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
     const input = validateSearchRequest(body);
+    const provider = parseSelectableResearchProvider(body.source);
     const data = await researchRateLimiter.run(async () => {
-      const adapter = createResearchAdapter();
+      const adapter = createResearchAdapter(provider);
       return (await adapter.searchContent(input)).map(validateSearchResult).slice(0, input.limit);
     });
     return NextResponse.json({ success: true, data });

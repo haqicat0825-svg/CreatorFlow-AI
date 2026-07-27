@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bot, Cpu, House, Images, Network, PenLine, Sparkles, UserRound } from "lucide-react";
+import { Bot, Cpu, FileText, House, Images, Network, PenLine, Sparkles, UserRound } from "lucide-react";
 
 const nav = [
   { href: "/", label: "首页", icon: House },
@@ -10,6 +10,7 @@ const nav = [
   { href: "/workflow", label: "Agent 流程", icon: Network },
   { href: "/creator", label: "内容创作", icon: PenLine },
   { href: "/visual-studio", label: "视觉工作室", icon: Sparkles },
+  { href: "/drafts", label: "草稿中心", icon: FileText },
   { href: "/models", label: "Model Hub", icon: Cpu },
 ];
 

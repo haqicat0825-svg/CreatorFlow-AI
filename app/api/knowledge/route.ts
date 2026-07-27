@@ -41,6 +41,22 @@ export async function POST(request: Request) {
   }
 }
 
+export async function DELETE(request: Request) {
+  try {
+    const body = await request.json() as { ids?: unknown };
+    if (!Array.isArray(body.ids) || body.ids.some(id => typeof id !== "string")) {
+      throw new KnowledgeRepositoryError("INVALID_INPUT", "删除列表无效。");
+    }
+    const deletedIds = await getKnowledgeRepository().delete(body.ids);
+    return NextResponse.json({ success: true, data: { deletedIds } });
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      return NextResponse.json({ success: false, error: { code: "INVALID_INPUT", message: "请求正文不是有效 JSON。" } }, { status: 400 });
+    }
+    return knowledgeErrorResponse(error);
+  }
+}
+
 function knowledgeErrorResponse(error: unknown) {
   if (error instanceof KnowledgeRepositoryError) {
     const status = error.code === "DUPLICATE" ? 409 : error.code === "NOT_FOUND" ? 404 : error.code === "INVALID_INPUT" ? 400 : 500;

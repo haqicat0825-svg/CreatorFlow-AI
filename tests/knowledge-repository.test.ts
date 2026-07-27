@@ -62,6 +62,42 @@ describe("FileKnowledgeRepository", () => {
     expect(created.research?.platform).toBe("tavily");
   });
 
+  it("persists a complete Xiaohongshu content asset", async () => {
+    const created = await repository.create({
+      ...input,
+      sourceType: "xiaohongshu",
+      sourceUrl: "https://www.xiaohongshu.com/explore/note-1",
+      author: "穿搭作者",
+      coverImage: "https://sns-img.example.com/cover.jpg",
+      images: ["https://sns-img.example.com/cover.jpg", "https://sns-img.example.com/detail.jpg"],
+      likes: 1234,
+      saves: 88,
+      comments: 12,
+      summary: "适合通勤场景的韩系搭配。",
+    });
+
+    expect(created).toEqual(expect.objectContaining({
+      sourceType: "xiaohongshu",
+      author: "穿搭作者",
+      coverImage: "https://sns-img.example.com/cover.jpg",
+      images: ["https://sns-img.example.com/cover.jpg", "https://sns-img.example.com/detail.jpg"],
+      likes: 1234,
+      saves: 88,
+      comments: 12,
+      summary: "适合通勤场景的韩系搭配。",
+    }));
+  });
+
+  it("deletes only selected knowledge records while preserving unrelated records", async () => {
+    const first = await repository.create(input);
+    const second = await repository.create({ ...unicodeInput, title: "保留的原始案例副本" });
+
+    expect(await repository.delete([first.id])).toEqual([first.id]);
+    await expect(repository.getById(first.id)).rejects.toMatchObject({ code: "NOT_FOUND" });
+    expect((await repository.list()).map(item => item.id)).toEqual([second.id]);
+    expect((await repository.list({ includeDeleted: true })).find(item => item.id === first.id)?.deletedAt).toBeTruthy();
+  });
+
   it("round-trips Chinese punctuation and emoji through UTF-8 storage", async () => {
     const created = await repository.create(unicodeInput);
     const raw = await readFile(path.join(directory, "knowledge.json"), "utf8");
