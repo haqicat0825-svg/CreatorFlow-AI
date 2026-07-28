@@ -43,6 +43,7 @@ export default function DraftStudioPage() {
           qualityStatus: "approved",
           authenticityStatus: "verified",
           model: draft.model,
+          prompt: draft.prompt,
           provider: draft.imageSource,
         }),
       });
@@ -80,10 +81,10 @@ export default function DraftStudioPage() {
               <div className="mt-4 flex flex-wrap items-center gap-2"><Hash size={14}/>{draft.tags.map(tag => <span key={tag} className="rounded-full bg-[var(--almond)] px-2.5 py-1 text-xs">{tag}</span>)}</div>
               <div className="mt-5 border-t border-[var(--line)] pt-4 text-xs text-[var(--muted)]"><p>模型 · {draft.model || "未记录"}</p><p className="mt-1">图片来源 · {sourceLabel(draft.imageSource)}</p></div>
               <div className="mt-4 grid grid-cols-2 gap-2">
-                <Link href={`/drafts/${encodeURIComponent(draft.id)}`} className="soft-button flex items-center justify-center gap-2 text-xs"><Pencil size={14}/>编辑草稿</Link>
+                <Link href={`/drafts/${encodeURIComponent(draft.id)}`} className="soft-button flex items-center justify-center gap-2 text-xs"><Pencil size={14}/>编辑内容</Link>
                 <button disabled={savingId === draft.id} onClick={() => void saveImage(draft)} className="soft-button flex items-center justify-center gap-2 text-xs disabled:opacity-60"><Download size={14}/>{savingId === draft.id ? "保存中…" : "保存图片"}</button>
-                <Link href={`/drafts/${encodeURIComponent(draft.id)}?focus=cover`} className="soft-button flex items-center justify-center gap-2 text-xs"><ImagePlus size={14}/>更换封面</Link>
-                <Link href={`/publish-center?draft=${encodeURIComponent(draft.id)}`} className="soft-button flex items-center justify-center gap-2 text-xs"><Send size={14}/>发布设置</Link>
+                <Link href={`/drafts/${encodeURIComponent(draft.id)}#cover`} className="soft-button flex items-center justify-center gap-2 text-xs"><ImagePlus size={14}/>替换封面</Link>
+                <Link href={`/publish-center?draft=${encodeURIComponent(draft.id)}`} className="soft-button flex items-center justify-center gap-2 text-xs"><Send size={14}/>发布管理</Link>
               </div>
             </div>
           </article>)}
@@ -101,5 +102,5 @@ function sourceLabel(source: Draft["imageSource"]) {
 }
 
 function statusLabel(status: Draft["publishStatus"]) {
-  return { draft: "draft", reviewing: "reviewing", ready: "ready", published: "published" }[status];
+  return { draft: "draft", reviewing: "reviewing", ready_to_publish: "ready_to_publish", published: "published" }[status];
 }

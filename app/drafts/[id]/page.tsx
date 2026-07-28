@@ -33,8 +33,18 @@ export default function DraftDetailPage({ params }: { params: Promise<{ id: stri
   const useLibraryCover = () => {
     const selected = loadSelectedCover(window.localStorage);
     if (!selected) return setNotice("AI 图片库中还没有已选择的当前封面。");
-    patch({ coverImage: selected.imageUrl, images: [...new Set([selected.imageUrl, ...(draft?.images ?? [])])], imageSource: "library" });
+    patch({
+      coverImage: selected.imageUrl,
+      images: [...new Set([selected.imageUrl, ...(draft?.images ?? [])])],
+      imageSource: "library",
+      prompt: selected.prompt ?? "",
+      model: selected.model ?? draft?.model ?? "",
+    });
     setNotice("已载入 AI 图片库当前封面，保存草稿后生效。");
+  };
+  const useGeneratedCover = (image: string) => {
+    patch({ coverImage: image, imageSource: "generated" });
+    setNotice("已选择当前生成图片，保存草稿后生效。");
   };
   const uploadCover = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -62,13 +72,28 @@ export default function DraftDetailPage({ params }: { params: Promise<{ id: stri
         <label className="block text-xs font-bold text-[var(--muted)]">正文<textarea maxLength={100000} value={draft.content} onChange={event => patch({ content: event.target.value })} className="mt-2 min-h-[420px] w-full resize-y rounded-2xl border border-[var(--line)] bg-[var(--cream)] px-4 py-3 text-sm leading-7 text-[var(--ink)] outline-none"/></label>
         <label className="block text-xs font-bold text-[var(--muted)]">标签（逗号分隔）<input value={tags} onChange={event => setTags(event.target.value)} className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white/70 px-4 py-3 text-sm text-[var(--ink)] outline-none"/></label>
       </div>
-      <aside className="panel h-fit overflow-hidden">
+      <aside id="cover" className="panel h-fit scroll-mt-6 overflow-hidden">
         <div className="grid min-h-80 place-items-center bg-[var(--almond)]/45 p-4">
           {draft.coverImage ? <img src={draft.coverImage} alt={`${draft.title} 封面预览`} className="max-h-[560px] w-full object-contain"/> : <div className="grid aspect-[3/4] w-full place-items-center text-sm text-[var(--muted)]">3:4 封面预览</div>}
         </div>
-        <div className="p-5"><p className="fine">Cover image · 完整比例显示</p><div className="mt-4 grid gap-2">
+        <div className="p-5"><p className="fine">Cover image · 3:4 区域完整比例显示</p>
+        {draft.images.length > 0 && <div className="mt-4">
+          <p className="text-xs font-bold text-[var(--muted)]">当前生成图片</p>
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            {draft.images.map(image => <button key={image} type="button" onClick={() => useGeneratedCover(image)} aria-label="选择当前生成图片作为封面" className={`grid aspect-[3/4] place-items-center overflow-hidden rounded-xl border bg-[var(--almond)]/40 p-1 ${draft.coverImage === image ? "border-[var(--rose-deep)]" : "border-[var(--line)]"}`}>
+              <img src={image} alt="" className="max-h-full max-w-full object-contain"/>
+            </button>)}
+          </div>
+        </div>}
+        <div className="mt-4 grid gap-2">
           <button onClick={useLibraryCover} className="soft-button flex items-center justify-center gap-2 text-sm"><ImagePlus size={15}/>从 AI 图片库更换</button>
           <label className="soft-button flex cursor-pointer items-center justify-center gap-2 text-sm"><Upload size={15}/>上传封面<input type="file" accept="image/*" onChange={uploadCover} className="sr-only"/></label>
+        </div>
+        <div className="mt-5 border-t border-[var(--line)] pt-4 text-xs leading-5 text-[var(--muted)]">
+          <p>图片来源 · {draft.imageSource}</p>
+          <p>生成模型 · {draft.model || "未记录"}</p>
+          <p className="mt-2 line-clamp-3">Prompt · {draft.prompt || "未记录"}</p>
+          <p className="mt-2">创建时间 · {new Date(draft.createdAt).toLocaleString("zh-CN")}</p>
         </div></div>
       </aside>
     </section>

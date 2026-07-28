@@ -15,7 +15,7 @@ export type LibraryItem = {
 };
 export type WorkflowStep = { id: string; name: string; subtitle: string; status: WorkflowStatus; model?: string; output?: string; duration?: string };
 export type EditableDraft = { title: string; body: string; tags: string[]; coverColors: [string, string, string] };
-export type DraftPublishStatus = "draft" | "reviewing" | "ready" | "published";
+export type DraftPublishStatus = "draft" | "reviewing" | "ready_to_publish" | "published";
 export type Draft = {
   id: string;
   title: string;
@@ -24,6 +24,7 @@ export type Draft = {
   coverImage: string;
   images: string[];
   imageSource: "generated" | "library" | "upload" | "none";
+  prompt: string;
   model: string;
   status: "draft";
   publishStatus: DraftPublishStatus;

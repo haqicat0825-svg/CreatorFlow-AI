@@ -4,8 +4,14 @@ export const DRAFT_STORAGE_KEY = "creatorflow-drafts";
 export const DRAFT_STORAGE_EVENT = "creatorflow:drafts-updated";
 
 type DraftCollection = { schemaVersion: "1"; drafts: Draft[] };
+type StoredDraft = Omit<Draft, "images" | "prompt" | "publishStatus"> & {
+  images?: string[];
+  prompt?: string;
+  publishStatus: Draft["publishStatus"] | "ready";
+};
 export type DraftInput = Pick<Draft, "title" | "content" | "tags" | "coverImage" | "imageSource" | "model"> & {
   images?: string[];
+  prompt?: string;
 };
 
 export function loadDrafts(storage: Pick<Storage, "getItem">): Draft[] {
@@ -14,7 +20,7 @@ export function loadDrafts(storage: Pick<Storage, "getItem">): Draft[] {
   try {
     const value = JSON.parse(raw) as Partial<DraftCollection>;
     if (value.schemaVersion !== "1" || !Array.isArray(value.drafts)) return [];
-    return value.drafts.filter(isDraft).map(normalizeDraft).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return (value.drafts as unknown[]).filter(isDraft).map(normalizeDraft).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   } catch {
     return [];
   }
@@ -29,6 +35,7 @@ export function saveDraft(storage: Pick<Storage, "getItem" | "setItem">, input: 
     coverImage: input.coverImage,
     images: uniqueImages(input.images ?? [], input.coverImage),
     imageSource: input.imageSource,
+    prompt: cleanText(input.prompt, 10_000),
     model: input.model.trim().slice(0, 200),
     status: "draft",
     publishStatus: "draft",
@@ -50,7 +57,7 @@ export function getDraft(storage: Pick<Storage, "getItem">, id: string): Draft |
 export function updateDraft(
   storage: Pick<Storage, "getItem" | "setItem">,
   id: string,
-  changes: Partial<Pick<Draft, "title" | "content" | "tags" | "coverImage" | "images" | "imageSource" | "publishStatus">>,
+  changes: Partial<Pick<Draft, "title" | "content" | "tags" | "coverImage" | "images" | "imageSource" | "prompt" | "model" | "publishStatus">>,
 ): Draft | undefined {
   const drafts = loadDrafts(storage);
   const current = drafts.find(draft => draft.id === id);
@@ -61,6 +68,8 @@ export function updateDraft(
     title: changes.title === undefined ? current.title : changes.title.trim().slice(0, 300),
     content: changes.content === undefined ? current.content : changes.content.trim().slice(0, 100_000),
     tags: changes.tags === undefined ? current.tags : sanitizeTags(changes.tags),
+    prompt: changes.prompt === undefined ? current.prompt : cleanText(changes.prompt, 10_000),
+    model: changes.model === undefined ? current.model : cleanText(changes.model, 200),
     images: uniqueImages(changes.images ?? current.images, changes.coverImage ?? current.coverImage),
   };
   storage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({
@@ -71,7 +80,7 @@ export function updateDraft(
   return updated;
 }
 
-function isDraft(value: unknown): value is Draft {
+function isDraft(value: unknown): value is StoredDraft {
   if (!value || typeof value !== "object") return false;
   const draft = value as Partial<Draft>;
   return typeof draft.id === "string"
@@ -81,15 +90,21 @@ function isDraft(value: unknown): value is Draft {
     && typeof draft.coverImage === "string"
     && (!("images" in draft) || Array.isArray(draft.images))
     && ["generated", "library", "upload", "none"].includes(draft.imageSource ?? "")
+    && (!("prompt" in draft) || typeof draft.prompt === "string")
     && typeof draft.model === "string"
     && draft.status === "draft"
-    && ["draft", "reviewing", "ready", "published"].includes(draft.publishStatus ?? "")
+    && ["draft", "reviewing", "ready", "ready_to_publish", "published"].includes(draft.publishStatus ?? "")
     && draft.platform === "xiaohongshu"
     && typeof draft.createdAt === "string";
 }
 
-function normalizeDraft(draft: Draft): Draft {
-  return { ...draft, images: uniqueImages(draft.images ?? [], draft.coverImage) };
+function normalizeDraft(draft: StoredDraft): Draft {
+  return {
+    ...draft,
+    images: uniqueImages(draft.images ?? [], draft.coverImage),
+    prompt: cleanText(draft.prompt, 10_000),
+    publishStatus: draft.publishStatus === "ready" ? "ready_to_publish" : draft.publishStatus,
+  };
 }
 
 function sanitizeTags(tags: string[]) {
@@ -98,6 +113,10 @@ function sanitizeTags(tags: string[]) {
 
 function uniqueImages(images: string[], coverImage: string) {
   return [...new Set([coverImage, ...images].filter(Boolean))].slice(0, 30);
+}
+
+function cleanText(value: unknown, maxLength: number) {
+  return typeof value === "string" ? value.trim().slice(0, maxLength) : "";
 }
 
 function dispatchDraftUpdate(draft: Draft) {

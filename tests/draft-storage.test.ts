@@ -25,6 +25,7 @@ describe("Draft Studio storage", () => {
       coverImage: "https://example.com/cover.png",
       images: ["https://example.com/cover.png"],
       imageSource: "generated",
+      prompt: "秋日街拍，暖色调",
       model: "deepseek-chat",
     });
 
@@ -35,6 +36,7 @@ describe("Draft Studio storage", () => {
       tags: ["穿搭", "秋日"],
       coverImage: "https://example.com/cover.png",
       imageSource: "generated",
+      prompt: "秋日街拍，暖色调",
       model: "deepseek-chat",
       status: "draft",
       publishStatus: "draft",
@@ -96,5 +98,30 @@ describe("Draft Studio storage", () => {
     }));
 
     expect(loadDrafts(storage)[0].images).toEqual(["https://example.com/legacy.png"]);
+  });
+
+  it("normalizes the legacy ready state and missing prompt", () => {
+    storage.setItem(DRAFT_STORAGE_KEY, JSON.stringify({
+      schemaVersion: "1",
+      drafts: [{
+        id: "legacy-ready",
+        title: "待发布草稿",
+        content: "正文",
+        tags: [],
+        coverImage: "",
+        images: [],
+        imageSource: "none",
+        model: "mock",
+        status: "draft",
+        publishStatus: "ready",
+        platform: "xiaohongshu",
+        createdAt: "2026-07-27T00:00:00.000Z",
+      }],
+    }));
+
+    expect(loadDrafts(storage)[0]).toMatchObject({
+      prompt: "",
+      publishStatus: "ready_to_publish",
+    });
   });
 });

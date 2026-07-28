@@ -143,6 +143,7 @@ export default function CreatorPage() {
       tags: draft.tags,
       coverImage: selectedCover?.imageUrl ?? "",
       imageSource: selectedCover?.source ?? "none",
+      prompt: selectedCover?.prompt ?? "",
       model: generated?.metadata.model ?? "未记录",
     });
   };

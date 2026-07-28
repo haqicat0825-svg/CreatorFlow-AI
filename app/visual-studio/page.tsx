@@ -247,7 +247,9 @@ export default function VisualStudioPage() {
       content: task.content,
       tags: task.tags ?? [],
       coverImage: image.url,
+      images: images.map(candidate => candidate.url),
       imageSource,
+      prompt,
       model: task.textModel ?? resultMeta?.model ?? "未记录",
     });
     setDraftSaved(true);
