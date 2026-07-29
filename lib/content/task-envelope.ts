@@ -153,6 +153,9 @@ export function createTrendContextFromSelection(
   const audienceInsights = analysis.audienceInsights.filter((item) =>
     overlapsEvidence(item.evidenceResultIds, selectedEvidenceIds)
   );
+  const viralReasons = analysis.viralReasons.filter((item) =>
+    overlapsEvidence(item.evidenceResultIds, selectedEvidenceIds)
+  );
   const cautions = analysis.cautions.filter((item) =>
     overlapsEvidence(item.evidenceResultIds, selectedEvidenceIds)
   );
@@ -160,7 +163,10 @@ export function createTrendContextFromSelection(
   const retainedEvidenceIds = new Set([
     ...topic.evidenceResultIds,
     ...trendSignals.flatMap((item) => item.evidenceResultIds),
+    ...analysis.viralElements.evidenceResultIds,
+    ...analysis.audienceProfile.evidenceResultIds,
     ...audienceInsights.flatMap((item) => item.evidenceResultIds),
+    ...viralReasons.flatMap((item) => item.evidenceResultIds),
     ...cautions.flatMap((item) => item.evidenceResultIds),
   ]);
   const sourceReferences = analysis.sourceReferences.filter(({ resultId }) =>
@@ -174,8 +180,23 @@ export function createTrendContextFromSelection(
       confidence,
       evidenceResultIds: [...evidenceResultIds],
     })),
+    viralElements: {
+      colors: [...analysis.viralElements.colors],
+      items: [...analysis.viralElements.items],
+      styles: [...analysis.viralElements.styles],
+      evidenceResultIds: [...analysis.viralElements.evidenceResultIds],
+    },
+    audienceProfile: {
+      ageRange: analysis.audienceProfile.ageRange,
+      needs: [...analysis.audienceProfile.needs],
+      evidenceResultIds: [...analysis.audienceProfile.evidenceResultIds],
+    },
     audienceInsights: audienceInsights.map(({ insight, evidenceResultIds }) => ({
       insight,
+      evidenceResultIds: [...evidenceResultIds],
+    })),
+    viralReasons: viralReasons.map(({ reason, evidenceResultIds }) => ({
+      reason,
       evidenceResultIds: [...evidenceResultIds],
     })),
     topicCandidates: [{

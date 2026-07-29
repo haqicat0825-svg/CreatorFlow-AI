@@ -72,8 +72,8 @@ function validateAnalyzeRequest(input: unknown): {
   }
 
   if (!Array.isArray(input.selectedResults)) invalid("selectedResults 必须是数组。");
-  if (input.selectedResults.length === 0) {
-    throw new TrendAnalysisApiError("INSUFFICIENT_EVIDENCE", "至少需要一条研究证据。", 422);
+  if (input.selectedResults.length < 3) {
+    throw new TrendAnalysisApiError("INSUFFICIENT_EVIDENCE", "请至少选择 3 条研究结果生成趋势分析。", 422);
   }
   if (input.selectedResults.length > ANALYSIS_LIMITS.maxSelectedResults) {
     tooLarge(`selectedResults 最多允许 ${ANALYSIS_LIMITS.maxSelectedResults} 条。`);

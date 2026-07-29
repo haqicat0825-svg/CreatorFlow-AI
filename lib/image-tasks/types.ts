@@ -1,4 +1,4 @@
-import type { ImageGenerationRequest, ImageGenerationResult } from "@/lib/providers/image-types";
+import type { ImageGenerationResult } from "@/lib/providers/image-types";
 
 export type ImageTaskStatus = "processing" | "completed" | "failed";
 
@@ -14,8 +14,6 @@ export type ImageGenerationTask = {
   id: string;
   status: ImageTaskStatus;
   step: ImageTaskStep;
-  prompt: string;
-  request: ImageGenerationRequest;
   requestedProvider?: string;
   requestedModel?: string;
   result?: ImageGenerationResult;
@@ -23,6 +21,7 @@ export type ImageGenerationTask = {
   error?: { code: string; message: string };
   createdAt: string;
   updatedAt: string;
+  startedAt?: string;
   completedAt?: string;
+  durationMs?: number;
 };
-

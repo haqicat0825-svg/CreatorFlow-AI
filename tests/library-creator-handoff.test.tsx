@@ -37,7 +37,22 @@ vi.mock("@/components/research-library", () => ({
         confidence: 0.8,
         evidenceResultIds: ["result-2"],
       }],
+      viralElements: {
+        colors: ["cream"],
+        items: ["shirt"],
+        styles: ["clean"],
+        evidenceResultIds: ["result-1"],
+      },
+      audienceProfile: {
+        ageRange: "18-25",
+        needs: ["practical guidance"],
+        evidenceResultIds: ["result-1"],
+      },
       audienceInsights: [],
+      viralReasons: [{
+        reason: "Practical structure",
+        evidenceResultIds: ["result-1"],
+      }],
       topicCandidates: [selectedTopic, {
         title: "Unselected candidate",
         angle: "Other angle.",
@@ -65,7 +80,7 @@ vi.mock("@/components/research-library", () => ({
     };
     return (
       <button onClick={() => onUseTopic(selectedTopic, analysis)}>
-        使用此选题创作
+        基于趋势生成内容
       </button>
     );
   },
@@ -88,7 +103,7 @@ describe("Research Library to Creator handoff", () => {
     const user = userEvent.setup();
     render(<LibraryPage />);
 
-    await user.click(screen.getByRole("button", { name: "使用此选题创作" }));
+    await user.click(screen.getByRole("button", { name: "基于趋势生成内容" }));
 
     const stored = window.sessionStorage.getItem(CREATOR_TASK_STORAGE_KEY) ?? "";
     expect(JSON.parse(stored)).toMatchObject({

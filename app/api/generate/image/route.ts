@@ -31,19 +31,20 @@ export async function POST(request: Request) {
 
   try {
     const serverConfig = resolveConfig(parsed.provider, parsed.model, getServerImageModelConfig());
+    const imageRequest: ImageGenerationRequest = {
+      prompt: parsed.prompt,
+      negativePrompt: parsed.negativePrompt,
+      aspectRatio: parsed.aspectRatio,
+      quality: parsed.quality,
+      candidateCount: parsed.candidateCount,
+      referenceContext: parsed.referenceContext,
+    };
     const task = await getImageTaskRepository().create({
-      request: {
-        prompt: parsed.prompt,
-        negativePrompt: parsed.negativePrompt,
-        aspectRatio: parsed.aspectRatio,
-        quality: parsed.quality,
-        candidateCount: parsed.candidateCount,
-        referenceContext: parsed.referenceContext,
-      },
+      request: imageRequest,
       provider: parsed.provider,
       model: parsed.model,
     });
-    startImageTask(task.id, serverConfig);
+    startImageTask(task.id, serverConfig, imageRequest);
     return NextResponse.json(
       { taskId: task.id, status: task.status },
       { status: 202, headers: { "Cache-Control": "no-store" } },

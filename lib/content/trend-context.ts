@@ -19,7 +19,10 @@ export function validateTrendContext(input: unknown): TrendContext {
   exactKeys(input, [
     "executiveSummary",
     "trendSignals",
+    "viralElements",
+    "audienceProfile",
     "audienceInsights",
+    "viralReasons",
     "topicCandidates",
     "cautions",
     "sourceReferences",
@@ -49,6 +52,29 @@ export function validateTrendContext(input: unknown): TrendContext {
       ),
     };
   });
+  if (!isRecord(input.viralElements)) invalid("viralElements must be an object.");
+  exactKeys(input.viralElements, ["colors", "items", "styles", "evidenceResultIds"], "viralElements");
+  const viralElements = {
+    colors: textList(input.viralElements.colors, "viralElements.colors"),
+    items: textList(input.viralElements.items, "viralElements.items"),
+    styles: textList(input.viralElements.styles, "viralElements.styles"),
+    evidenceResultIds: parseEvidenceIds(
+      input.viralElements.evidenceResultIds,
+      evidenceIds,
+      "viralElements.evidenceResultIds",
+    ),
+  };
+  if (!isRecord(input.audienceProfile)) invalid("audienceProfile must be an object.");
+  exactKeys(input.audienceProfile, ["ageRange", "needs", "evidenceResultIds"], "audienceProfile");
+  const audienceProfile = {
+    ageRange: text(input.audienceProfile.ageRange, "audienceProfile.ageRange"),
+    needs: textList(input.audienceProfile.needs, "audienceProfile.needs"),
+    evidenceResultIds: parseEvidenceIds(
+      input.audienceProfile.evidenceResultIds,
+      evidenceIds,
+      "audienceProfile.evidenceResultIds",
+    ),
+  };
   const audienceInsights = records(input.audienceInsights, "audienceInsights").map((item, index) => {
     exactKeys(item, ["insight", "evidenceResultIds"], `audienceInsights[${index}]`);
     return {
@@ -57,6 +83,17 @@ export function validateTrendContext(input: unknown): TrendContext {
         item.evidenceResultIds,
         evidenceIds,
         `audienceInsights[${index}].evidenceResultIds`,
+      ),
+    };
+  });
+  const viralReasons = records(input.viralReasons, "viralReasons").map((item, index) => {
+    exactKeys(item, ["reason", "evidenceResultIds"], `viralReasons[${index}]`);
+    return {
+      reason: text(item.reason, `viralReasons[${index}].reason`),
+      evidenceResultIds: parseEvidenceIds(
+        item.evidenceResultIds,
+        evidenceIds,
+        `viralReasons[${index}].evidenceResultIds`,
       ),
     };
   });
@@ -110,7 +147,10 @@ export function validateTrendContext(input: unknown): TrendContext {
   return {
     executiveSummary,
     trendSignals,
+    viralElements,
+    audienceProfile,
     audienceInsights,
+    viralReasons,
     topicCandidates,
     cautions,
     sourceReferences,
@@ -131,8 +171,13 @@ export function formatTrendContext(context: TrendContext): string {
     ...context.trendSignals.map(
       (item) => `Trend signal (${Math.round(item.confidence * 100)}% confidence; evidence: ${item.evidenceResultIds.join(", ")}): ${item.signal}`,
     ),
+    `Viral elements (evidence: ${context.viralElements.evidenceResultIds.join(", ")}): colors=${context.viralElements.colors.join(", ")}; items=${context.viralElements.items.join(", ")}; styles=${context.viralElements.styles.join(", ")}`,
+    `Audience profile (evidence: ${context.audienceProfile.evidenceResultIds.join(", ")}): age=${context.audienceProfile.ageRange}; needs=${context.audienceProfile.needs.join(", ")}`,
     ...context.audienceInsights.map(
       (item) => `Audience insight (evidence: ${item.evidenceResultIds.join(", ")}): ${item.insight}`,
+    ),
+    ...context.viralReasons.map(
+      (item) => `Viral reason (evidence: ${item.evidenceResultIds.join(", ")}): ${item.reason}`,
     ),
     ...context.topicCandidates.map(
       (item) => `Topic candidate "${item.title}" (evidence: ${item.evidenceResultIds.join(", ")}): angle=${item.angle}; rationale=${item.rationale}`,
@@ -189,6 +234,13 @@ function records(input: unknown, path: string, max: number = LIMITS.maxItems): R
     if (!isRecord(item)) invalid(`${path}[${index}] must be an object.`);
     return item;
   });
+}
+
+function textList(input: unknown, path: string) {
+  if (!Array.isArray(input) || input.length === 0 || input.length > LIMITS.maxItems) {
+    invalid(`${path} is invalid.`);
+  }
+  return [...new Set(input.map((item, index) => text(item, `${path}[${index}]`)))];
 }
 
 function text(input: unknown, path: string, max: number = LIMITS.itemLength) {

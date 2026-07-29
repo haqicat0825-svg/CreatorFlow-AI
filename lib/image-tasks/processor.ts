@@ -2,14 +2,15 @@ import { getKnowledgeRepository, KnowledgeRepositoryError } from "@/lib/knowledg
 import type { ServerImageModelConfig } from "@/lib/models/config-types";
 import { createImageAdapter } from "@/lib/providers/image-factory";
 import { ModelAdapterError } from "@/lib/providers/types";
+import type { ImageGenerationRequest } from "@/lib/providers/image-types";
 import { getImageTaskRepository } from "./repository";
 
 const running = new Map<string, Promise<void>>();
 
-export function startImageTask(taskId: string, serverConfig: ServerImageModelConfig) {
+export function startImageTask(taskId: string, serverConfig: ServerImageModelConfig, request: ImageGenerationRequest) {
   if (running.has(taskId)) return;
   setTimeout(() => {
-    const work = processImageTask(taskId, serverConfig).finally(() => running.delete(taskId));
+    const work = processImageTask(taskId, serverConfig, request).finally(() => running.delete(taskId));
     running.set(taskId, work);
   }, 0);
 }
@@ -19,14 +20,16 @@ export async function waitForImageTasks() {
   await Promise.all([...running.values()]);
 }
 
-async function processImageTask(taskId: string, serverConfig: ServerImageModelConfig) {
+async function processImageTask(taskId: string, serverConfig: ServerImageModelConfig, request: ImageGenerationRequest) {
   const tasks = getImageTaskRepository();
+  const startedAt = new Date();
   try {
     const task = await tasks.get(taskId);
     if (!task || task.status !== "processing") return;
+    await tasks.update(taskId, { startedAt: startedAt.toISOString() });
 
-    const visualMemory = await getKnowledgeRepository().search(task.prompt, {
-      tags: task.request.referenceContext?.style,
+    const visualMemory = await getKnowledgeRepository().search(request.prompt, {
+      tags: request.referenceContext?.style,
       categories: ["style_preference", "ai_image"],
       limit: 6,
     });
@@ -36,20 +39,20 @@ async function processImageTask(taskId: string, serverConfig: ServerImageModelCo
       ...(result.item.prompt ? [result.item.prompt.slice(0, 240)] : []),
     ]).slice(0, 12);
     const requestWithMemory = {
-      ...task.request,
+      ...request,
       referenceContext: {
-        ...task.request.referenceContext,
-        style: [...new Set([...(task.request.referenceContext?.style ?? []), ...memoryStyles])].slice(0, 16),
+        ...request.referenceContext,
+        style: [...new Set([...(request.referenceContext?.style ?? []), ...memoryStyles])].slice(0, 16),
       },
     };
 
     await tasks.setStep(taskId, "calling_model");
     const generation = createImageAdapter({
       ...serverConfig,
-      aspectRatio: task.request.aspectRatio,
-      size: sizeFor(task.request.aspectRatio),
-      quality: task.request.quality,
-      candidateCount: task.request.candidateCount,
+      aspectRatio: request.aspectRatio,
+      size: sizeFor(request.aspectRatio),
+      quality: request.quality,
+      candidateCount: request.candidateCount,
     }).generateImage(requestWithMemory);
     await tasks.setStep(taskId, "generating_image");
     const result = await generation;
@@ -60,17 +63,17 @@ async function processImageTask(taskId: string, serverConfig: ServerImageModelCo
       try {
         const item = await getKnowledgeRepository().create({
           category: "ai_image",
-          title: `AI 图片 · ${task.prompt.slice(0, 52)} · ${index + 1}`,
-          content: `${task.prompt}\n\nImage: ${image.url}`,
+          title: `AI 图片 · ${request.prompt.slice(0, 52)} · ${index + 1}`,
+          content: `${request.prompt}\n\nImage: ${image.url}`,
           sourceType: "other",
-          tags: [...new Set([...(task.request.referenceContext?.style ?? []), "AI图片"])],
+          tags: [...new Set([...(request.referenceContext?.style ?? []), "AI图片"])],
           contentType: "reference",
           qualityStatus: "approved",
           authenticityStatus: result.isMock ? "unverified" : "verified",
           imageUrl: image.url,
           coverImage: image.url,
           images: [image.url],
-          prompt: task.prompt,
+          prompt: request.prompt,
           model: result.model,
           provider: result.provider,
         });
@@ -84,20 +87,23 @@ async function processImageTask(taskId: string, serverConfig: ServerImageModelCo
       }
     }
 
-    const completedAt = new Date().toISOString();
+    const completed = new Date();
     await tasks.update(taskId, {
       status: "completed",
       step: "completed",
       result,
       libraryItemIds,
-      completedAt,
+      completedAt: completed.toISOString(),
+      durationMs: Math.max(0, completed.getTime() - startedAt.getTime()),
     });
   } catch (error) {
     const mapped = mapTaskError(error);
+    const completed = new Date();
     await tasks.update(taskId, {
       status: "failed",
       error: mapped,
-      completedAt: new Date().toISOString(),
+      completedAt: completed.toISOString(),
+      durationMs: Math.max(0, completed.getTime() - startedAt.getTime()),
     }).catch(() => undefined);
   }
 }
@@ -111,11 +117,12 @@ function safeMessage(code: string) {
   const messages: Record<string, string> = {
     UNAUTHORIZED: "图片模型鉴权失败，请检查服务端配置。",
     RATE_LIMITED: "图片模型请求过于频繁，请稍后重试。",
-    TIMEOUT: "图片模型处理超时，请稍后重试。",
+    TIMEOUT: "图片模型响应时间较长，请稍后重试",
+    IMAGE_PROVIDER_TIMEOUT: "图片模型响应时间较长，请稍后重试",
     CONTENT_REJECTED: "图片请求未通过安全检查，请修改 Prompt。",
     CONFIGURATION_MISSING: "图片模型尚未完成服务端配置。",
   };
-  return messages[code] ?? "图片模型暂时不可用，请稍后重试。";
+  return messages[code] ?? "图片服务暂时不可用";
 }
 
 function sizeFor(ratio: "3:4" | "1:1" | "4:3"): ServerImageModelConfig["size"] {

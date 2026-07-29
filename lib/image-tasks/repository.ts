@@ -6,6 +6,7 @@ import type { ImageGenerationTask, ImageTaskStep } from "./types";
 
 export class ImageTaskRepository {
   private writeQueue: Promise<void> = Promise.resolve();
+  private readonly runtimeResults = new Map<string, ImageGenerationTask["result"]>();
 
   constructor(private readonly filePath = getTaskFilePath()) {}
 
@@ -19,8 +20,6 @@ export class ImageTaskRepository {
       id: randomUUID(),
       status: "processing",
       step: "analyzing",
-      prompt: input.request.prompt,
-      request: input.request,
       requestedProvider: input.provider,
       requestedModel: input.model,
       createdAt: now,
@@ -31,28 +30,38 @@ export class ImageTaskRepository {
   }
 
   async get(id: string) {
-    return (await this.readAll()).find(task => task.id === id);
+    const task = (await this.readAll()).find(item => item.id === id);
+    return task ? this.withRuntimeResult(task) : undefined;
   }
 
   async latest() {
-    return (await this.readAll()).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    const task = (await this.readAll()).sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0];
+    return task ? this.withRuntimeResult(task) : undefined;
   }
 
   async update(id: string, patch: Partial<Pick<ImageGenerationTask,
-    "status" | "step" | "result" | "libraryItemIds" | "error" | "completedAt"
+    "status" | "step" | "result" | "libraryItemIds" | "error" | "startedAt" | "completedAt" | "durationMs"
   >>) {
+    if (patch.result) this.runtimeResults.set(id, patch.result);
+    const persistedPatch = { ...patch };
+    delete persistedPatch.result;
     let updated: ImageGenerationTask | undefined;
     await this.mutate(tasks => tasks.map(task => {
       if (task.id !== id) return task;
-      updated = { ...task, ...patch, updatedAt: new Date().toISOString() };
+      updated = { ...task, ...persistedPatch, updatedAt: new Date().toISOString() };
       return updated;
     }));
     if (!updated) throw new Error("Image generation task not found.");
-    return updated;
+    return this.withRuntimeResult(updated);
   }
 
   async setStep(id: string, step: ImageTaskStep) {
     return this.update(id, { step });
+  }
+
+  private withRuntimeResult(task: ImageGenerationTask): ImageGenerationTask {
+    const result = this.runtimeResults.get(task.id);
+    return result ? { ...task, result } : task;
   }
 
   private async readAll(): Promise<ImageGenerationTask[]> {
@@ -105,4 +114,3 @@ function getTaskFilePath() {
   }
   return path.join(directory, "image-generation-tasks.json");
 }
-

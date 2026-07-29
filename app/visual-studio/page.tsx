@@ -117,7 +117,6 @@ export default function VisualStudioPage() {
   const applyTask = (serverTask: ImageGenerationTask) => {
     setActiveTaskId(serverTask.id);
     setActiveStep(serverTask.step);
-    if (serverTask.prompt) setPrompt(serverTask.prompt);
     if (serverTask.status === "processing") {
       setGenerationState("generating");
       return;
@@ -259,8 +258,7 @@ export default function VisualStudioPage() {
     <PageHeader eyebrow="AI Visual Direction" title="Visual Studio" description="把主题转化为清晰的封面方向，在最多四个候选中选出最符合个人风格的一张。"/>
     <div className="mt-4 min-h-8" aria-live="polite">
       {generationState === "generating" && <div>
-        <p className="text-sm font-semibold text-[var(--ink)]">AI 正在生成封面</p>
-        <p className="mt-1 text-xs text-[var(--muted)]">预计需要 30–90 秒，请耐心等待</p>
+        <p className="text-sm font-semibold text-[var(--ink)]">AI 正在生成封面，预计需要 1-2 分钟</p>
       </div>}
       {resultMeta && generationState === "success" && <p className={`rounded-xl px-4 py-2 text-sm ${resultMeta.isMock ? "bg-[var(--almond)] font-semibold" : "text-[var(--muted)]"}`}>{resultMeta.isMock ? "Demo / Mock：未调用真实图片模型。" : `真实模型：${resultMeta.provider} / ${resultMeta.model}`}</p>}
       {error && <p role="alert" className="rounded-xl bg-[var(--rose)]/25 px-4 py-2 text-sm text-[var(--rose-deep)]">{error}</p>}
@@ -336,10 +334,11 @@ function imageErrorMessage(code: string | undefined) {
   const messages: Record<string, string> = {
     UNAUTHORIZED: "图片模型鉴权失败，请检查服务端环境变量。",
     RATE_LIMITED: "图片模型请求过于频繁，请稍后重试。",
-    TIMEOUT: "图片生成超时，Prompt 和已有候选已保留。",
+    TIMEOUT: "图片模型响应时间较长，请稍后重试",
+    IMAGE_PROVIDER_TIMEOUT: "图片模型响应时间较长，请稍后重试",
     CONTENT_REJECTED: "Prompt 未通过内容安全检查，请调整后重试。",
     INVALID_RESPONSE: "图片模型返回了无效结果。",
     INVALID_REQUEST: "图片生成参数无效，请检查 Prompt 和选项。",
   };
-  return messages[code ?? ""] ?? "图片生成失败，Prompt 和已有候选已保留。";
+  return messages[code ?? ""] ?? "图片服务暂时不可用";
 }

@@ -2,7 +2,7 @@ import { ModelAdapterError } from "./types";
 import type { ImageAdapterConfig, ImageGenerationAdapter, ImageGenerationRequest } from "./image-types";
 
 const ARK_IMAGE_GENERATIONS_URL = "https://ark.cn-beijing.volces.com/api/v3/images/generations";
-const TIMEOUT_MS = 90_000;
+const DEFAULT_TIMEOUT_MS = 180_000;
 
 export function createVolcengineJimengImageAdapter(config: ImageAdapterConfig): ImageGenerationAdapter {
   return {
@@ -10,7 +10,7 @@ export function createVolcengineJimengImageAdapter(config: ImageAdapterConfig): 
     model: config.model,
     async generateImage(request: ImageGenerationRequest) {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+      const timeout = setTimeout(() => controller.abort(), getTimeoutMs());
       try {
         const response = await fetch(ARK_IMAGE_GENERATIONS_URL, {
           method: "POST",
@@ -53,8 +53,8 @@ export function createVolcengineJimengImageAdapter(config: ImageAdapterConfig): 
         };
       } catch (error) {
         if (error instanceof ModelAdapterError) throw error;
-        if (error instanceof Error && error.name === "AbortError") {
-          throw new ModelAdapterError("TIMEOUT", "图片生成超时。", 504);
+        if (isAbortError(error)) {
+          throw new ModelAdapterError("IMAGE_PROVIDER_TIMEOUT", "图片生成超时。", 504);
         }
         throw new ModelAdapterError("UPSTREAM_ERROR", "图片服务暂时不可用。", 502);
       } finally {
@@ -78,7 +78,16 @@ async function mapArkError(response: Response) {
     return new ModelAdapterError("RATE_LIMITED", "图片服务请求过于频繁。", 429);
   }
   if (response.status === 408 || response.status === 504) {
-    return new ModelAdapterError("TIMEOUT", "图片生成超时。", 504);
+    return new ModelAdapterError("IMAGE_PROVIDER_TIMEOUT", "图片生成超时。", 504);
   }
   return new ModelAdapterError("UPSTREAM_ERROR", "图片服务暂时不可用。", 502);
+}
+
+function isAbortError(error: unknown): error is { name: "AbortError" } {
+  return typeof error === "object" && error !== null && "name" in error && error.name === "AbortError";
+}
+
+function getTimeoutMs(env: NodeJS.ProcessEnv = process.env) {
+  const configured = Number.parseInt(env.VOLCENGINE_IMAGE_TIMEOUT_MS ?? "", 10);
+  return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_TIMEOUT_MS;
 }

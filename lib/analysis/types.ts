@@ -13,6 +13,21 @@ export type AudienceInsight = EvidenceBackedItem & {
   insight: string;
 };
 
+export type ViralElements = EvidenceBackedItem & {
+  colors: string[];
+  items: string[];
+  styles: string[];
+};
+
+export type AudienceProfile = EvidenceBackedItem & {
+  ageRange: string;
+  needs: string[];
+};
+
+export type ViralReason = EvidenceBackedItem & {
+  reason: string;
+};
+
 export type TopicCandidate = EvidenceBackedItem & {
   title: string;
   angle: string;
@@ -32,7 +47,10 @@ export type SourceReference = {
 export type TrendAnalysisResult = {
   executiveSummary: string;
   trendSignals: TrendSignal[];
+  viralElements: ViralElements;
+  audienceProfile: AudienceProfile;
   audienceInsights: AudienceInsight[];
+  viralReasons: ViralReason[];
   topicCandidates: TopicCandidate[];
   cautions: TrendCaution[];
   sourceReferences: SourceReference[];

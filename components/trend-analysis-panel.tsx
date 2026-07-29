@@ -21,7 +21,7 @@ export function TrendAnalysisPanel({ result, onUseTopic }: TrendAnalysisPanelPro
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="fine">Evidence-backed analysis</p>
-          <h3 className="mt-1 font-bold">趋势分析</h3>
+          <h3 className="mt-1 font-bold">趋势洞察</h3>
         </div>
         <span className={`rounded-full px-3 py-1.5 text-xs font-bold ${result.metadata.isMock ? "bg-[var(--almond)] text-[var(--ink)]" : "bg-green-100 text-green-800"}`}>
           {result.metadata.isMock ? "DEMO / MOCK" : "真实模型分析"}
@@ -29,7 +29,7 @@ export function TrendAnalysisPanel({ result, onUseTopic }: TrendAnalysisPanelPro
       </div>
 
       <section className="mt-5 rounded-2xl border border-[var(--line)] bg-white/70 p-4">
-        <h4 className="text-sm font-bold">执行摘要</h4>
+        <h4 className="text-sm font-bold">热门趋势总结</h4>
         <p className="mt-2 text-sm leading-6 text-[var(--muted)]">{result.executiveSummary}</p>
       </section>
 
@@ -45,10 +45,23 @@ export function TrendAnalysisPanel({ result, onUseTopic }: TrendAnalysisPanelPro
         <AnalysisList title="受众洞察">
           {result.audienceInsights.map((item, index) => <li key={`${item.insight}-${index}`}>{item.insight}</li>)}
         </AnalysisList>
+        <AnalysisList title="爆款元素提取">
+          <li><strong>色彩：</strong>{result.viralElements.colors.join("、")}</li>
+          <li><strong>单品：</strong>{result.viralElements.items.join("、")}</li>
+          <li><strong>风格：</strong>{result.viralElements.styles.join("、")}</li>
+        </AnalysisList>
+        <AnalysisList title="用户画像">
+          <li><strong>年龄：</strong>{result.audienceProfile.ageRange}</li>
+          <li><strong>需求：</strong>{result.audienceProfile.needs.join("、")}</li>
+        </AnalysisList>
       </div>
 
+      <AnalysisList title="爆款原因分析" className="mt-4">
+        {result.viralReasons.map((item, index) => <li key={`${item.reason}-${index}`}>{item.reason}</li>)}
+      </AnalysisList>
+
       <section className="mt-4">
-        <h4 className="text-sm font-bold">选题候选</h4>
+        <h4 className="text-sm font-bold">推荐选题 · 10 个小红书标题</h4>
         <p className="mt-1 text-xs text-[var(--muted)]">选择只保留在当前页面，不会自动进入 Creator。</p>
         <div className="mt-3 grid gap-3">
           {result.topicCandidates.map((topic, index) => {
@@ -75,7 +88,7 @@ export function TrendAnalysisPanel({ result, onUseTopic }: TrendAnalysisPanelPro
             onClick={() => selectedTopic && onUseTopic?.(selectedTopic, result)}
             className="primary-button disabled:cursor-not-allowed disabled:opacity-45"
           >
-            使用此选题创作
+            基于趋势生成内容
           </button>
         </div>
       </section>

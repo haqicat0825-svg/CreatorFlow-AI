@@ -19,28 +19,42 @@ const evidence = {
   retrievedAt: "2026-07-26T00:00:00.000Z",
   isMock: true,
 };
+const evidenceSet = Array.from({ length: 3 }, (_, index) => ({
+  ...evidence,
+  id: `result-${index + 1}`,
+  title: `Evidence title ${index + 1}`,
+  sourceUrl: `https://example.com/evidence-${index + 1}`,
+}));
 
 const analysis = {
   executiveSummary: "[MOCK] Supported summary.",
   trendSignals: [{ signal: "Signal", confidence: 0.8, evidenceResultIds: ["result-1"] }],
+  viralElements: {
+    colors: ["奶油白"],
+    items: ["针织衫"],
+    styles: ["Clean Fit"],
+    evidenceResultIds: ["result-1"],
+  },
+  audienceProfile: {
+    ageRange: "18-25岁",
+    needs: ["低成本复刻"],
+    evidenceResultIds: ["result-1"],
+  },
   audienceInsights: [{ insight: "Insight", evidenceResultIds: ["result-1"] }],
-  topicCandidates: [{
-    title: "Topic",
-    angle: "Angle",
+  viralReasons: [{ reason: "Reason", evidenceResultIds: ["result-1"] }],
+  topicCandidates: Array.from({ length: 10 }, (_, index) => ({
+    title: `Topic ${index + 1}`,
+    angle: `Angle ${index + 1}`,
     rationale: "Rationale",
     evidenceResultIds: ["result-1"],
-  }],
+  })),
   cautions: [{ caution: "Caution", evidenceResultIds: ["result-1"] }],
-  sourceReferences: [{
-    resultId: "result-1",
-    title: "Evidence title",
-    sourceUrl: "https://example.com/evidence",
-  }],
+  sourceReferences: evidenceSet.map(({ id: resultId, title, sourceUrl }) => ({ resultId, title, sourceUrl })),
   metadata: {
     provider: "mock",
     model: "test mock",
     generatedAt: "2026-07-26T00:00:00.000Z",
-    inputResultCount: 1,
+    inputResultCount: 3,
     schemaVersion: "1",
     isMock: true,
   },
@@ -66,15 +80,17 @@ describe("POST /api/research/analyze", () => {
   });
 
   it("returns a validated mock analysis without calling a real API", async () => {
-    const result = await response({ query: "creator trends", selectedResults: [evidence], context: "Optional context" });
+    const result = await response({ query: "creator trends", selectedResults: evidenceSet, context: "Optional context" });
     expect(result.status).toBe(200);
     expect(result.json).toEqual({ success: true, data: analysis });
     expect(analyze).toHaveBeenCalledOnce();
-    expect(analyze).toHaveBeenCalledWith([evidence]);
+    expect(analyze.mock.calls[0][0].map(({ id }: { id: string }) => id)).toEqual(
+      evidenceSet.map(({ id }) => id),
+    );
   });
 
   it("rejects empty evidence", async () => {
-    const result = await response({ query: "creator trends", selectedResults: [] });
+    const result = await response({ query: "creator trends", selectedResults: evidenceSet.slice(0, 2) });
     expect(result).toMatchObject({ status: 422, json: { error: { code: "INSUFFICIENT_EVIDENCE" } } });
     expect(analyze).not.toHaveBeenCalled();
   });
@@ -87,7 +103,10 @@ describe("POST /api/research/analyze", () => {
   });
 
   it("rejects invalid evidence", async () => {
-    const result = await response({ query: "creator trends", selectedResults: [{ ...evidence, sourceUrl: "file:///secret" }] });
+    const result = await response({ query: "creator trends", selectedResults: [
+      { ...evidenceSet[0], sourceUrl: "file:///secret" },
+      ...evidenceSet.slice(1),
+    ] });
     expect(result).toMatchObject({ status: 400, json: { error: { code: "INVALID_REQUEST" } } });
     expect(analyze).not.toHaveBeenCalled();
   });
@@ -98,7 +117,7 @@ describe("POST /api/research/analyze", () => {
       { model: "some-model" },
       { apiKey: "secret" },
     ]) {
-      const result = await response({ query: "creator trends", selectedResults: [evidence], ...forbidden });
+      const result = await response({ query: "creator trends", selectedResults: evidenceSet, ...forbidden });
       expect(result).toMatchObject({ status: 400, json: { error: { code: "INVALID_REQUEST" } } });
     }
     expect(analyze).not.toHaveBeenCalled();
@@ -106,7 +125,7 @@ describe("POST /api/research/analyze", () => {
 
   it("maps provider errors to the public error contract", async () => {
     analyze.mockRejectedValueOnce(new ModelAdapterError("UPSTREAM_ERROR", "sensitive upstream detail", 502));
-    const result = await response({ query: "creator trends", selectedResults: [evidence] });
+    const result = await response({ query: "creator trends", selectedResults: evidenceSet });
     expect(result).toMatchObject({ status: 502, json: { error: { code: "UPSTREAM_ERROR" } } });
     expect(JSON.stringify(result.json)).not.toContain("sensitive upstream detail");
   });
@@ -116,7 +135,7 @@ describe("POST /api/research/analyze", () => {
       ...analysis,
       trendSignals: [{ signal: "Unsupported", confidence: 1, evidenceResultIds: ["invented"] }],
     });
-    const result = await response({ query: "creator trends", selectedResults: [evidence] });
+    const result = await response({ query: "creator trends", selectedResults: evidenceSet });
     expect(result).toMatchObject({ status: 502, json: { error: { code: "UPSTREAM_ERROR" } } });
   });
 });

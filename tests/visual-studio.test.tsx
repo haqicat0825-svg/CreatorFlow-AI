@@ -64,8 +64,7 @@ describe("Visual Studio asynchronous image flow", () => {
     await user.selectOptions(await screen.findByLabelText("候选"), "1");
     await user.click(screen.getByRole("button", { name: "生成 1 张" }));
 
-    expect(screen.getByText("AI 正在生成封面")).toBeInTheDocument();
-    expect(screen.getByText("预计需要 30–90 秒，请耐心等待")).toBeInTheDocument();
+    expect(screen.getByText("AI 正在生成封面，预计需要 1-2 分钟")).toBeInTheDocument();
     ["分析穿搭主题", "构建视觉 Prompt", "调用 Seedream 模型", "生成封面图片", "保存到图片库"]
       .forEach(label => expect(screen.getByText(label)).toBeInTheDocument());
     expect(screen.getByText("调用 Seedream 模型").parentElement).toHaveTextContent("•");
@@ -96,8 +95,31 @@ describe("Visual Studio asynchronous image flow", () => {
     vi.stubGlobal("fetch", fetchMock);
     render(<VisualStudioPage />);
 
-    expect(await screen.findByText("AI 正在生成封面")).toBeInTheDocument();
+    expect(await screen.findByText("AI 正在生成封面，预计需要 1-2 分钟")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText("保存到图片库").parentElement).toHaveTextContent("•"));
+  });
+
+  it("shows distinct timeout and provider failure messages", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url === "/api/models/test") return json(modelCheck);
+      if (url === "/api/generate/image/status") {
+        return json({
+          success: true,
+          data: {
+            ...task("completed", "calling_model"),
+            status: "failed",
+            error: { code: "IMAGE_PROVIDER_TIMEOUT", message: "图片模型响应时间较长，请稍后重试" },
+          },
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<VisualStudioPage />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("图片模型响应时间较长，请稍后重试");
+    expect(screen.queryByText("图片服务暂时不可用")).not.toBeInTheDocument();
   });
 });
 
@@ -106,8 +128,6 @@ function task(status: "processing" | "completed", step: string) {
     id: "task-1",
     status,
     step,
-    prompt: "韩系穿搭封面",
-    request: { prompt: "韩系穿搭封面", aspectRatio: "3:4", quality: "medium", candidateCount: 1 },
     createdAt: "2026-07-27T00:00:00.000Z",
     updatedAt: "2026-07-27T00:00:01.000Z",
   };

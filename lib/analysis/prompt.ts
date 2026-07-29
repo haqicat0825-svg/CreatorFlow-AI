@@ -11,10 +11,19 @@ Required JSON shape:
 {
   "executiveSummary": "non-empty string",
   "trendSignals": [{"signal":"string","confidence":0.0,"evidenceResultIds":["input-id"]}],
+  "viralElements": {"colors":["string"],"items":["string"],"styles":["string"],"evidenceResultIds":["input-id"]},
+  "audienceProfile": {"ageRange":"string","needs":["string"],"evidenceResultIds":["input-id"]},
   "audienceInsights": [{"insight":"string","evidenceResultIds":["input-id"]}],
+  "viralReasons": [{"reason":"string","evidenceResultIds":["input-id"]}],
   "topicCandidates": [{"title":"string","angle":"string","rationale":"string","evidenceResultIds":["input-id"]}],
   "cautions": [{"caution":"string","evidenceResultIds":["input-id"]}]
 }
+Write the analysis in Chinese for Xiaohongshu creators.
+executiveSummary must state the current popular trend.
+viralElements must extract colors, items, and styles.
+audienceProfile must state an age range and concrete audience needs.
+viralReasons must explain why the evidence is likely to earn interaction; do not invent metrics.
+topicCandidates must contain exactly 10 distinct Xiaohongshu-ready titles.
 confidence must be between 0 and 1. Do not add fields.`;
 
 export function buildTrendAnalysisPrompt(results: SearchResult[]) {

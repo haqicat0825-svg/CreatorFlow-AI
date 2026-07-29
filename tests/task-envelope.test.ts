@@ -31,8 +31,23 @@ const analysis: TrendAnalysisResult = {
       evidenceResultIds: ["result-2"],
     },
   ],
+  viralElements: {
+    colors: ["奶油白"],
+    items: ["针织衫"],
+    styles: ["Clean Fit"],
+    evidenceResultIds: ["result-1"],
+  },
+  audienceProfile: {
+    ageRange: "18-25岁",
+    needs: ["低成本复刻通勤穿搭"],
+    evidenceResultIds: ["result-1"],
+  },
   audienceInsights: [{
     insight: "Commuters prefer reusable combinations.",
+    evidenceResultIds: ["result-1"],
+  }],
+  viralReasons: [{
+    reason: "可执行公式提高收藏意愿。",
     evidenceResultIds: ["result-1"],
   }],
   topicCandidates: [
@@ -126,12 +141,15 @@ describe("CreatorTaskEnvelope trend handoff", () => {
 
     expect(Object.keys(context).sort()).toEqual([
       "audienceInsights",
+      "audienceProfile",
       "cautions",
       "executiveSummary",
       "metadata",
       "sourceReferences",
       "topicCandidates",
       "trendSignals",
+      "viralElements",
+      "viralReasons",
     ]);
     expect(Object.keys(context.topicCandidates[0]).sort()).toEqual([
       "angle",

@@ -28,21 +28,24 @@ where npm.cmd >nul 2>&1 || (
   exit /b 1
 )
 
-for /f "usebackq delims=" %%P in (`powershell.exe -NoProfile -Command "$c = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue ^| Select-Object -First 1; if ($c) { $c.OwningProcess }"`) do set "PORT_PID=%%P"
+echo 正在检查端口 3000...
+powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$connections = @(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue);" ^
+  "if ($connections.Count -eq 0) { exit 0 };" ^
+  "$processes = @(); foreach ($connection in $connections) { if ($null -eq ($processes.ProcessId) -or $connection.OwningProcess -notin $processes.ProcessId) { $item = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $connection.OwningProcess) -ErrorAction SilentlyContinue; if ($item) { $processes += $item } } };" ^
+  "$notNext = @(); foreach ($process in $processes) { if ($process.Name -notmatch '(?i)^node(\.exe)?$' -or $process.CommandLine -notmatch '(?i)([\\/]next[\\/]|next-server|next\.js)') { $notNext += $process } };" ^
+  "if ($notNext.Count -gt 0 -or $processes.Count -eq 0) { Write-Host ('[错误] 端口 3000 已被非 Next.js 程序占用，PID：' + ($connections.OwningProcess -join ', ')); exit 2 };" ^
+  "foreach ($process in $processes) { Write-Host ('检测到 Next.js 进程占用端口 3000，正在结束 PID：' + $process.ProcessId); Stop-Process -Id $process.ProcessId -Force -ErrorAction Stop };" ^
+  "$deadline = (Get-Date).AddSeconds(10);" ^
+  "do { Start-Sleep -Milliseconds 250; $remaining = @(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue) } while ($remaining.Count -gt 0 -and (Get-Date) -lt $deadline);" ^
+  "if ($remaining.Count -gt 0) { Write-Host '[错误] 无法释放端口 3000。'; exit 3 };" ^
+  "Write-Host '端口 3000 已释放。'; exit 0"
+set "PORT_CHECK_EXIT=%ERRORLEVEL%"
 
-if defined PORT_PID (
-  powershell.exe -NoProfile -Command "$project = [IO.Path]::GetFullPath($env:CREATORFLOW_DIR).TrimEnd('\'); $p = Get-CimInstance Win32_Process -Filter ('ProcessId=' + $env:PORT_PID) -ErrorAction SilentlyContinue; $line = if ($p) { [string]$p.CommandLine } else { '' }; if ($line -like ('*' + $project + '*') -and $line -match '(?i)next|node') { exit 0 } else { exit 1 }"
-  if errorlevel 1 (
-    echo [错误] 端口 3000 已被其他程序占用，PID：%PORT_PID%
-    echo 为避免影响其他程序，CreatorFlow AI 未启动。
-    pause
-    exit /b 1
-  )
-
-  echo 检测到 CreatorFlow AI 已在端口 3000 运行，直接打开浏览器...
-  powershell.exe -NoProfile -Command "Start-Process $env:CREATORFLOW_URL"
+if not "%PORT_CHECK_EXIT%"=="0" (
+  echo CreatorFlow AI 未启动。
   pause
-  exit /b 0
+  exit /b %PORT_CHECK_EXIT%
 )
 
 echo 正在启动 Next.js 开发服务器，请稍候...

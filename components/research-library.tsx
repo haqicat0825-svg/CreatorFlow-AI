@@ -6,6 +6,7 @@ import { TrendAnalysisPanel } from "@/components/trend-analysis-panel";
 import type { TopicCandidate, TrendAnalysisResult } from "@/lib/analysis/types";
 import type { LoginStatus, SearchResult } from "@/lib/research/types";
 import type { SelectableResearchProvider } from "@/lib/research/factory";
+import { recordTrendAnalysis } from "@/lib/dashboard/status";
 
 type AnalysisStatus = "idle" | "searching" | "importing" | "analyzing";
 
@@ -14,7 +15,7 @@ type ResearchLibraryProps = {
 };
 
 export function ResearchLibrary({ onUseTopic }: ResearchLibraryProps = {}) {
-  const [source, setSource] = useState<SelectableResearchProvider>("xiaohongshu-cli");
+  const [source, setSource] = useState<SelectableResearchProvider>("tavily");
   const [statuses, setStatuses] = useState<Partial<Record<SelectableResearchProvider, LoginStatus>>>({});
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -26,7 +27,9 @@ export function ResearchLibrary({ onUseTopic }: ResearchLibraryProps = {}) {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const status = statuses[source];
-  const realSearchAvailable = Boolean(status?.available && status.loggedIn);
+  const realSearchAvailable = source === "tavily"
+    ? Boolean(status?.available)
+    : Boolean(status?.available && status.loggedIn);
   const busy = analysisStatus !== "idle";
 
   useEffect(() => {
@@ -103,14 +106,18 @@ export function ResearchLibrary({ onUseTopic }: ResearchLibraryProps = {}) {
     setAnalysis(undefined);
     setSelected(previous => {
       const next = new Set(previous);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else if (next.size < 10) next.add(id);
       return next;
     });
   };
 
   const analyzeTrends = async () => {
     const selectedResults = results.filter(result => selected.has(result.id));
-    if (!selectedResults.length) return;
+    if (selectedResults.length < 3 || selectedResults.length > 10) {
+      setError("请选择 3-10 条研究结果后生成趋势分析。");
+      return;
+    }
     setAnalysisStatus("analyzing");
     setAnalysis(undefined);
     setError("");
@@ -124,6 +131,7 @@ export function ResearchLibrary({ onUseTopic }: ResearchLibraryProps = {}) {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error?.message ?? "趋势分析失败。");
       setAnalysis(payload.data);
+      if (window.localStorage) recordTrendAnalysis(window.localStorage, payload.data);
     } catch (cause) {
       setAnalysis(undefined);
       setError(cause instanceof Error ? cause.message : "趋势分析失败。");
@@ -181,9 +189,9 @@ export function ResearchLibrary({ onUseTopic }: ResearchLibraryProps = {}) {
         </span>
       </div>)}</div>
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--line)] p-5 sm:px-6">
-        <span className="text-xs text-[var(--muted)]">已选择 {selected.size} 条</span>
+        <span className="text-xs text-[var(--muted)]">已选择 {selected.size} 条 · 趋势分析需选择 3-10 条</span>
         <div className="flex flex-wrap gap-2">
-          <button type="button" disabled={busy || selected.size === 0} onClick={analyzeTrends} className="rounded-full border border-[var(--ink)] px-4 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-45">{analysisStatus === "analyzing" ? "分析中…" : "分析趋势"}</button>
+          <button type="button" disabled={busy || selected.size < 3 || selected.size > 10} onClick={analyzeTrends} className="rounded-full border border-[var(--ink)] px-4 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-45">{analysisStatus === "analyzing" ? "分析中…" : "分析趋势"}</button>
           <button type="button" disabled={busy || selected.size === 0 || results.filter(result => selected.has(result.id)).some(result => result.source !== "xiaohongshu")} onClick={() => void importSelected("hot-content")} className="soft-button disabled:cursor-not-allowed disabled:opacity-45">{analysisStatus === "importing" ? "入库中…" : "加入爆款案例库"}</button>
           <button type="button" disabled={busy || selected.size === 0} onClick={() => void importSelected("content-knowledge")} className="primary-button disabled:cursor-not-allowed disabled:opacity-45">{analysisStatus === "importing" ? "入库中…" : "加入知识库"}</button>
         </div>

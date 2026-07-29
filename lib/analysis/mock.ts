@@ -14,16 +14,31 @@ export const mockTrendAnalysisAdapter: TrendAnalysisAdapter = {
         confidence: 0.5,
         evidenceResultIds: [primary.id],
       }],
+      viralElements: {
+        colors: ["[MOCK] 奶油白", "[MOCK] 灰粉", "[MOCK] 黑白"],
+        items: ["[MOCK] 针织衫", "[MOCK] 半裙", "[MOCK] 蝴蝶结"],
+        styles: ["[MOCK] Soft Girl", "[MOCK] Clean Fit"],
+        evidenceResultIds: ids,
+      },
+      audienceProfile: {
+        ageRange: "[MOCK] 18-25岁",
+        needs: ["[MOCK] 低成本复刻博主穿搭", "[MOCK] 获得可直接执行的搭配公式"],
+        evidenceResultIds: ids,
+      },
       audienceInsights: [{
         insight: "[MOCK] 受众更关注可执行、具体且有证据支持的内容。",
         evidenceResultIds: ids,
       }],
-      topicCandidates: [{
-        title: `[MOCK] ${primary.title}：值得关注的变化`,
-        angle: "[MOCK] 从研究证据中提炼变化与实际启示。",
-        rationale: "[MOCK] 该候选主题直接对应输入研究结果。",
-        evidenceResultIds: [primary.id],
+      viralReasons: [{
+        reason: "[MOCK] 清晰的视觉标签、低门槛复刻路径和具体清单提高了收藏与互动意愿。",
+        evidenceResultIds: ids,
       }],
+      topicCandidates: Array.from({ length: 10 }, (_, index) => ({
+        title: `[MOCK] ${index + 1}. ${primary.title}：可执行选题`,
+        angle: `[MOCK] 角度 ${index + 1}：从研究证据提炼具体行动。`,
+        rationale: "[MOCK] 该候选主题直接对应输入研究结果。",
+        evidenceResultIds: [results[index % results.length].id],
+      })),
       cautions: [{
         caution: "[MOCK] 此结果仅用于流程测试，不代表真实模型判断。",
         evidenceResultIds: ids,

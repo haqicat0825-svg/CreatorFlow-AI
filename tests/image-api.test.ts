@@ -1,7 +1,8 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { rm } from "node:fs/promises";
+import { readFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { POST } from "@/app/api/generate/image/route";
+import { GET as GET_STATUS } from "@/app/api/generate/image/status/route";
 import { createOpenAIImageAdapter } from "@/lib/providers/openai-image";
 import { createVolcengineJimengImageAdapter } from "@/lib/providers/volcengine-jimeng-image";
 import { ModelAdapterError } from "@/lib/providers/types";
@@ -49,6 +50,32 @@ describe("image generation API", () => {
     expect(response.status).toBe(202);
     expect(payload).toMatchObject({ status: "processing" });
     expect(payload.taskId).toEqual(expect.any(String));
+  });
+
+  it("records task timing transitions without persisting prompts or image URLs", async () => {
+    process.env.CREATORFLOW_IMAGE_PROVIDER = "mock";
+    const response = await POST(request(validBody));
+    const { taskId } = await response.json();
+
+    await waitForImageTasks();
+    const statusResponse = await GET_STATUS(new Request(`http://localhost/api/generate/image/status?id=${taskId}`));
+    const payload = await statusResponse.json();
+
+    expect(payload.data).toMatchObject({
+      id: taskId,
+      status: "completed",
+      step: "completed",
+      startedAt: expect.any(String),
+      completedAt: expect.any(String),
+      durationMs: expect.any(Number),
+    });
+    expect(payload.data.durationMs).toBeGreaterThanOrEqual(0);
+
+    const persisted = await readFile(path.join(testDataDirectory, "image-generation-tasks.json"), "utf8");
+    expect(persisted).not.toContain(validBody.prompt);
+    expect(persisted).not.toContain("\"prompt\"");
+    expect(persisted).not.toContain("\"url\"");
+    expect(persisted).not.toContain("apiKey");
   });
 
   it("rejects non-whitelisted providers, oversized prompts and too many candidates", async () => {
@@ -154,12 +181,39 @@ describe("Ark image error mapping", () => {
   it.each([
     [401, "UNAUTHORIZED"],
     [429, "RATE_LIMITED"],
-    [504, "TIMEOUT"],
+    [504, "IMAGE_PROVIDER_TIMEOUT"],
     [500, "UPSTREAM_ERROR"],
   ])("maps upstream status %s safely", async (status, code) => {
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("upstream details", { status })));
     await expect(createVolcengineJimengImageAdapter(config).generateImage(input))
       .rejects.toMatchObject({ code });
+  });
+
+  it("uses the configured timeout and exposes the dedicated timeout code", async () => {
+    process.env.VOLCENGINE_IMAGE_TIMEOUT_MS = "25";
+    vi.stubGlobal("fetch", vi.fn((_url: string, init?: RequestInit) => new Promise((_resolve, reject) => {
+      init?.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")));
+    })));
+
+    const started = Date.now();
+    await expect(createVolcengineJimengImageAdapter(config).generateImage(input))
+      .rejects.toMatchObject({
+        code: "IMAGE_PROVIDER_TIMEOUT",
+        message: "图片生成超时。",
+      });
+    expect(Date.now() - started).toBeLessThan(1_000);
+  });
+
+  it("defaults the provider timeout to 180 seconds", async () => {
+    delete process.env.VOLCENGINE_IMAGE_TIMEOUT_MS;
+    const timeoutSpy = vi.spyOn(globalThis, "setTimeout");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      data: [{ url: "https://example.com/generated.png" }],
+    }), { status: 200 })));
+
+    await createVolcengineJimengImageAdapter(config).generateImage(input);
+
+    expect(timeoutSpy).toHaveBeenCalledWith(expect.any(Function), 180_000);
   });
 });
 

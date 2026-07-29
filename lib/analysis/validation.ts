@@ -6,7 +6,7 @@ import type { TrendAnalysisResult } from "./types";
 export const TREND_ANALYSIS_JSON_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["executiveSummary", "trendSignals", "audienceInsights", "topicCandidates", "cautions"],
+  required: ["executiveSummary", "trendSignals", "viralElements", "audienceProfile", "audienceInsights", "viralReasons", "topicCandidates", "cautions"],
   properties: {
     executiveSummary: { type: "string", minLength: 1 },
     trendSignals: {
@@ -17,12 +17,30 @@ export const TREND_ANALYSIS_JSON_SCHEMA = {
         required: ["signal", "confidence", "evidenceResultIds"],
       },
     },
+    viralElements: {
+      type: "object",
+      additionalProperties: false,
+      required: ["colors", "items", "styles", "evidenceResultIds"],
+    },
+    audienceProfile: {
+      type: "object",
+      additionalProperties: false,
+      required: ["ageRange", "needs", "evidenceResultIds"],
+    },
     audienceInsights: {
       type: "array",
       items: {
         type: "object",
         additionalProperties: false,
         required: ["insight", "evidenceResultIds"],
+      },
+    },
+    viralReasons: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["reason", "evidenceResultIds"],
       },
     },
     topicCandidates: {
@@ -45,8 +63,8 @@ export const TREND_ANALYSIS_JSON_SCHEMA = {
 } as const;
 
 export function validateResearchResults(input: unknown): SearchResult[] {
-  if (!Array.isArray(input) || input.length === 0) {
-    throw new ModelAdapterError("SCHEMA_MISMATCH", "Trend analysis requires at least one research result.", 400);
+  if (!Array.isArray(input) || input.length < 3 || input.length > 10) {
+    throw new ModelAdapterError("SCHEMA_MISMATCH", "Trend analysis requires 3 to 10 research results.", 400);
   }
   const results = input.map(validateSearchResult);
   if (new Set(results.map((result) => result.id)).size !== results.length) {
@@ -77,11 +95,33 @@ export function validateTrendAnalysisCore(input: unknown, results: SearchResult[
       evidenceResultIds: evidenceIds(item.evidenceResultIds, results, `trendSignals[${index}].evidenceResultIds`),
     };
   });
+  const viralElements = object(input.viralElements, "viralElements");
+  exactObject(viralElements, ["colors", "items", "styles", "evidenceResultIds"], "viralElements");
+  const parsedViralElements = {
+    colors: stringArray(viralElements.colors, "viralElements.colors"),
+    items: stringArray(viralElements.items, "viralElements.items"),
+    styles: stringArray(viralElements.styles, "viralElements.styles"),
+    evidenceResultIds: evidenceIds(viralElements.evidenceResultIds, results, "viralElements.evidenceResultIds"),
+  };
+  const audienceProfile = object(input.audienceProfile, "audienceProfile");
+  exactObject(audienceProfile, ["ageRange", "needs", "evidenceResultIds"], "audienceProfile");
+  const parsedAudienceProfile = {
+    ageRange: nonEmpty(audienceProfile.ageRange, "audienceProfile.ageRange"),
+    needs: stringArray(audienceProfile.needs, "audienceProfile.needs"),
+    evidenceResultIds: evidenceIds(audienceProfile.evidenceResultIds, results, "audienceProfile.evidenceResultIds"),
+  };
   const audienceInsights = array(input.audienceInsights, "audienceInsights").map((item, index) => {
     exactObject(item, ["insight", "evidenceResultIds"], `audienceInsights[${index}]`);
     return {
       insight: nonEmpty(item.insight, `audienceInsights[${index}].insight`),
       evidenceResultIds: evidenceIds(item.evidenceResultIds, results, `audienceInsights[${index}].evidenceResultIds`),
+    };
+  });
+  const viralReasons = array(input.viralReasons, "viralReasons").map((item, index) => {
+    exactObject(item, ["reason", "evidenceResultIds"], `viralReasons[${index}]`);
+    return {
+      reason: nonEmpty(item.reason, `viralReasons[${index}].reason`),
+      evidenceResultIds: evidenceIds(item.evidenceResultIds, results, `viralReasons[${index}].evidenceResultIds`),
     };
   });
   const topicCandidates = array(input.topicCandidates, "topicCandidates").map((item, index) => {
@@ -93,6 +133,7 @@ export function validateTrendAnalysisCore(input: unknown, results: SearchResult[
       evidenceResultIds: evidenceIds(item.evidenceResultIds, results, `topicCandidates[${index}].evidenceResultIds`),
     };
   });
+  if (topicCandidates.length !== 10) fail("topicCandidates");
   const cautions = array(input.cautions, "cautions").map((item, index) => {
     exactObject(item, ["caution", "evidenceResultIds"], `cautions[${index}]`);
     return {
@@ -100,7 +141,16 @@ export function validateTrendAnalysisCore(input: unknown, results: SearchResult[
       evidenceResultIds: evidenceIds(item.evidenceResultIds, results, `cautions[${index}].evidenceResultIds`),
     };
   });
-  return { executiveSummary, trendSignals, audienceInsights, topicCandidates, cautions };
+  return {
+    executiveSummary,
+    trendSignals,
+    viralElements: parsedViralElements,
+    audienceProfile: parsedAudienceProfile,
+    audienceInsights,
+    viralReasons,
+    topicCandidates,
+    cautions,
+  };
 }
 
 function evidenceIds(input: unknown, results: SearchResult[], path: string) {
@@ -121,6 +171,16 @@ function array(input: unknown, path: string): Record<string, unknown>[] {
     if (!isRecord(item)) fail(`${path}[${index}]`);
     return item;
   });
+}
+
+function object(input: unknown, path: string): Record<string, unknown> {
+  if (!isRecord(input)) fail(path);
+  return input;
+}
+
+function stringArray(input: unknown, path: string) {
+  if (!Array.isArray(input) || input.length === 0 || input.length > 12) fail(path);
+  return [...new Set(input.map((value, index) => nonEmpty(value, `${path}[${index}]`)))];
 }
 
 function exactObject(input: unknown, keys: string[], path: string): asserts input is Record<string, unknown> {

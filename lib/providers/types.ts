@@ -63,6 +63,7 @@ export type ModelErrorCode =
   | "UNAUTHORIZED"
   | "RATE_LIMITED"
   | "TIMEOUT"
+  | "IMAGE_PROVIDER_TIMEOUT"
   | "EMPTY_RESPONSE"
   | "TRUNCATED_RESPONSE"
   | "INVALID_JSON"

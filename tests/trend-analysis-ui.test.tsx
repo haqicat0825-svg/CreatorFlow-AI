@@ -25,18 +25,40 @@ const results = [
     retrievedAt: "2026-07-26T00:00:00.000Z",
     isMock: false,
   },
+  {
+    id: "result-3",
+    title: "Evidence three",
+    summary: "Third evidence summary",
+    sourceUrl: "https://example.com/three",
+    tags: ["engagement"],
+    source: "tavily" as const,
+    retrievedAt: "2026-07-26T00:00:00.000Z",
+    isMock: false,
+  },
 ];
 
 const analysis: TrendAnalysisResult = {
   executiveSummary: "Creator education is gaining momentum.",
   trendSignals: [{ signal: "Tutorial demand is rising.", confidence: 0.86, evidenceResultIds: ["result-1"] }],
+  viralElements: {
+    colors: ["奶油白", "灰粉"],
+    items: ["针织衫", "半裙"],
+    styles: ["Clean Fit"],
+    evidenceResultIds: ["result-1"],
+  },
+  audienceProfile: {
+    ageRange: "18-25岁",
+    needs: ["低成本复刻博主穿搭"],
+    evidenceResultIds: ["result-1"],
+  },
   audienceInsights: [{ insight: "New creators want practical guidance.", evidenceResultIds: ["result-1"] }],
-  topicCandidates: [{
-    title: "A seven-day creator workflow",
-    angle: "Turn research into one repeatable weekly system.",
+  viralReasons: [{ reason: "Practical lists encourage saves.", evidenceResultIds: ["result-1"] }],
+  topicCandidates: Array.from({ length: 10 }, (_, index) => ({
+    title: index === 0 ? "A seven-day creator workflow" : `Creator topic ${index + 1}`,
+    angle: `Turn research into repeatable system ${index + 1}.`,
     rationale: "The selected evidence supports demand for practical tutorials.",
     evidenceResultIds: ["result-1"],
-  }],
+  })),
   cautions: [{ caution: "The evidence set is small.", evidenceResultIds: ["result-1"] }],
   sourceReferences: [{
     resultId: "result-1",
@@ -58,7 +80,7 @@ function response(data: unknown) {
 }
 
 function installFetch() {
-  const fetchMock = vi.fn((input: RequestInfo | URL) => {
+  const fetchMock = vi.fn((input: RequestInfo | URL, _init?: RequestInit) => {
     const url = String(input);
     if (url.startsWith("/api/research/status")) {
       return response({ available: true, loggedIn: true, provider: "tavily", safeMessage: "Tavily 可用。" });
@@ -75,6 +97,12 @@ async function search(user: ReturnType<typeof userEvent.setup>) {
   await user.type(screen.getByPlaceholderText("输入关键词后手动搜索"), "creator trends");
   await user.click(screen.getByRole("button", { name: "搜索" }));
   await screen.findByText("Evidence one");
+}
+
+async function selectMinimumEvidence(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("checkbox", { name: /Evidence one/ }));
+  await user.click(screen.getByRole("checkbox", { name: /Evidence two/ }));
+  await user.click(screen.getByRole("checkbox", { name: /Evidence three/ }));
 }
 
 beforeEach(() => {
@@ -96,21 +124,24 @@ describe("Trend Analysis UI", () => {
     const user = userEvent.setup();
     render(<ResearchLibrary />);
     await search(user);
-    await user.click(screen.getByRole("checkbox", { name: /Evidence one/ }));
+    await selectMinimumEvidence(user);
     await user.click(screen.getByRole("button", { name: "分析趋势" }));
 
     expect(await screen.findByText(analysis.executiveSummary)).toBeInTheDocument();
     expect(screen.getByText("Tutorial demand is rising.")).toBeInTheDocument();
     expect(screen.getByText("New creators want practical guidance.")).toBeInTheDocument();
+    expect(screen.getByText(/奶油白、灰粉/)).toBeInTheDocument();
+    expect(screen.getByText(/18-25岁/)).toBeInTheDocument();
+    expect(screen.getByText("Practical lists encourage saves.")).toBeInTheDocument();
     expect(screen.getByText("The evidence set is small.")).toBeInTheDocument();
     expect(screen.getByText("DEMO / MOCK")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /A seven-day creator workflow/ })).toHaveAttribute("aria-pressed", "false");
-    expect(screen.getByRole("button", { name: "使用此选题创作" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "基于趋势生成内容" })).toBeDisabled();
     const analyzeCall = fetchMock.mock.calls.find(([input]) => String(input).endsWith("/api/research/analyze"));
     expect(analyzeCall?.[1]).toMatchObject({
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query: "creator trends", selectedResults: [results[0]] }),
+      body: JSON.stringify({ query: "creator trends", selectedResults: results }),
     });
   });
 
@@ -120,13 +151,13 @@ describe("Trend Analysis UI", () => {
     const user = userEvent.setup();
     render(<ResearchLibrary onUseTopic={onUseTopic} />);
     await search(user);
-    await user.click(screen.getByRole("checkbox", { name: /Evidence one/ }));
+    await selectMinimumEvidence(user);
     await user.click(screen.getByRole("button", { name: "分析趋势" }));
     await user.click(await screen.findByRole("button", { name: /A seven-day creator workflow/ }));
 
     expect(screen.getByRole("button", { name: /A seven-day creator workflow/ })).toHaveAttribute("aria-pressed", "true");
     expect(window.location.pathname).toBe("/");
-    await user.click(screen.getByRole("button", { name: "使用此选题创作" }));
+    await user.click(screen.getByRole("button", { name: "基于趋势生成内容" }));
     expect(onUseTopic).toHaveBeenCalledWith(analysis.topicCandidates[0], analysis);
     expect(window.location.pathname).toBe("/");
   });
@@ -136,7 +167,7 @@ describe("Trend Analysis UI", () => {
     const user = userEvent.setup();
     render(<ResearchLibrary />);
     await search(user);
-    await user.click(screen.getByRole("checkbox", { name: /Evidence one/ }));
+    await selectMinimumEvidence(user);
     await user.click(screen.getByRole("button", { name: "分析趋势" }));
     expect(await screen.findByText(analysis.executiveSummary)).toBeInTheDocument();
 
